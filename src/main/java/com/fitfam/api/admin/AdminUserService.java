@@ -123,7 +123,8 @@ public class AdminUserService {
 	private static CustomerDto toDto(User user, List<Enrollment> userEnrollments) {
 		List<EnrollmentDto> items = userEnrollments.stream()
 				.map(e -> new EnrollmentDto(e.getPlan().getSlug(), e.getPlan().getNameHe(),
-						e.getCurrentLevel().getLevelNumber(), e.getCurrentLevel().getSlug(), e.getStatus()))
+						e.getCurrentLevel().getLevelNumber(), e.getCurrentLevel().getSlug(),
+						e.getCurrentLevel().getNameHe(), e.getStatus()))
 				.toList();
 		return new CustomerDto(String.valueOf(user.getId()), user.getEmail(), user.getRole(), user.getStatus(),
 				user.getDisplayName(), user.getFirstLoginAt(), items);

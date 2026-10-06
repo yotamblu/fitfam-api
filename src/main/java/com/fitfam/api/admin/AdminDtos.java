@@ -23,7 +23,8 @@ public final class AdminDtos {
 	public record PlanDto(String slug, String nameHe, List<LevelDto> levels) {
 	}
 
-	public record EnrollmentDto(String planSlug, String planNameHe, int levelNumber, String levelSlug, String status) {
+	public record EnrollmentDto(String planSlug, String planNameHe, int levelNumber, String levelSlug,
+			String levelNameHe, String status) {
 	}
 
 	public record CustomerDto(String id, String email, String role, String status, String displayName,
