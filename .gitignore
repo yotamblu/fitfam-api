@@ -50,3 +50,6 @@ application-secret*.properties
 application-secret*.yml
 *.log
 .DS_Store
+
+### Local-only DB seed/business data (never commit) ###
+/db-local/
