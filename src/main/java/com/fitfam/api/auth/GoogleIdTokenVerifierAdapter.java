@@ -5,6 +5,8 @@ import java.security.GeneralSecurityException;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +23,8 @@ import com.google.api.client.json.gson.GsonFactory;
  */
 @Component
 public class GoogleIdTokenVerifierAdapter implements GoogleTokenVerifier {
+
+	private static final Logger log = LoggerFactory.getLogger(GoogleIdTokenVerifierAdapter.class);
 
 	private final GoogleIdTokenVerifier verifier;
 
@@ -44,12 +48,13 @@ public class GoogleIdTokenVerifierAdapter implements GoogleTokenVerifier {
 					(String) payload.get("name"),
 					(String) payload.get("picture")));
 		}
-		catch (GeneralSecurityException | IllegalArgumentException e) {
-			// malformed or tampered token
+		catch (GeneralSecurityException | RuntimeException e) {
+			// malformed or tampered token (the library can throw unchecked exceptions for missing claims)
 			return Optional.empty();
 		}
 		catch (IOException e) {
-			// could not reach Google to fetch its public keys: not the caller's fault
+			// could not reach Google to fetch its public keys: not the caller's fault (log the cause, never the token)
+			log.warn("Could not fetch Google's public keys: {}", e.toString());
 			throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "google_unavailable");
 		}
 	}

@@ -193,6 +193,13 @@ $env:MAVEN_OPTS = "-Djavax.net.ssl.trustStoreType=Windows-ROOT -Djavax.net.ssl.t
 You only need this when Maven has to **download** something (first build, or after adding a dependency). Once
 dependencies are cached in `~/.m2`, normal runs do not need it.
 
+**Login returns 503 (`google_unavailable`) on Windows.**
+The API could not fetch Google's public keys because the JDK's truststore rejects Google's certificate (same cause as
+above). The `windows-truststore` Maven profile in `pom.xml` makes `spring-boot:run` use the Windows certificate store
+automatically on Windows. If you run the jar yourself on Windows, add
+`-Djavax.net.ssl.trustStoreType=Windows-ROOT -Djavax.net.ssl.trustStore=NUL`. Linux (including production) needs
+nothing.
+
 **Port already in use.** Set a different `PORT` (see [Configuration](#configuration)), or stop the other process.
 
 ## Security and secrets

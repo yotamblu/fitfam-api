@@ -122,4 +122,29 @@
 		</plugins>
 	</build>
 
+	<profiles>
+		<!-- On some Windows machines (antivirus HTTPS inspection) the JDK's own truststore rejects Google's
+		     certificate, so token verification fails. Use the Windows certificate store for spring-boot:run.
+		     Only active on Windows; production runs the jar on Linux and is not affected. -->
+		<profile>
+			<id>windows-truststore</id>
+			<activation>
+				<os>
+					<family>windows</family>
+				</os>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-maven-plugin</artifactId>
+						<configuration>
+							<jvmArguments>-Djavax.net.ssl.trustStoreType=Windows-ROOT -Djavax.net.ssl.trustStore=NUL</jvmArguments>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
 </project>
