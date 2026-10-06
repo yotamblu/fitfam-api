@@ -2,8 +2,8 @@
 
 The Spring Boot backend for **FitFam**, a fitness training platform.
 
-> **Status: early scaffold.** The only endpoint today is `GET /health`. There is no database, no authentication and no
-> business logic yet. This README describes what exists now and, clearly marked, what is planned.
+> **Status: early development.** Health check, Google-based login and a few admin endpoints exist. This README describes
+> what exists now and, clearly marked, what is planned.
 
 ---
 
@@ -48,8 +48,8 @@ Postgres  ->  Spring Boot (this repo, the ONLY thing that talks to the DB)  ->  
 | Framework | Spring Boot 4.1.1 |
 | Build | Maven (wrapper included, no global Maven needed) |
 | Web | Spring Web MVC |
-| Other starters | Validation, Actuator |
-| Planned | Spring Data JPA / Hibernate on Supabase Postgres, springdoc-openapi, Google ID token verification |
+| Other | Validation, Actuator, Spring Security (stateless), Spring Data JPA, Flyway, PostgreSQL, google-api-client, jjwt |
+| Planned | springdoc-openapi |
 | Planned hosting | Railway |
 
 ## Prerequisites
@@ -92,21 +92,46 @@ Stop the app with **Ctrl+C**.
 
 ## Endpoints
 
-| Method | Path | Description | Response |
-|--------|------|-------------|----------|
-| `GET` | `/health` | Simple liveness check | `200 {"status":"ok"}` |
-| `GET` | `/actuator/health` | Spring Boot Actuator health (the only Actuator endpoint exposed by default) | `200 {"status":"UP", ...}` |
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| `GET` | `/health` | public | Liveness check, returns `{"status":"ok"}` |
+| `GET` | `/actuator/health` | public | Spring Boot Actuator health |
+| `POST` | `/auth/google` | public | Body `{"credential": "<Google ID token>"}`. Verifies the token and, if the email was pre-approved, sets the session cookie |
+| `GET` | `/auth/me` | logged in | The current user |
+| `POST` | `/auth/logout` | public | Clears the session cookie |
+| `GET` | `/admin/plans` | admin | Available plans and their levels |
+| `GET` | `/admin/users` | admin | Users with their enrollments |
+| `POST` | `/admin/users` | admin | Pre-approve a user by email and enroll them in plans |
 
-No other endpoints exist yet.
+Errors are returned as `{"error": "<code>"}` (for example `invalid_token`, `not_invited`, `email_exists`).
 
 ## Configuration
 
-Configuration lives in `src/main/resources/application.properties`.
+Configuration lives in `src/main/resources/application.properties`; it contains no secrets, only `${ENV_VAR}`
+references. Locally the values are read from a gitignored `.env` file in the project root (`KEY=value` lines); in
+production they are real environment variables.
 
-| Property | Default | Notes |
-|----------|---------|-------|
-| `spring.application.name` | `fitfam-api` | |
-| `server.port` | `${PORT:8081}` | Reads the `PORT` env var if set (Railway injects it), otherwise **8081**. 8081 is used locally because 8080 is commonly taken (for example by IIS on some Windows machines). |
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DB_URL` | yes | JDBC URL of the Postgres database |
+| `DB_USER` | yes | Database user |
+| `DB_PASSWORD` | yes | Database password |
+| `GOOGLE_CLIENT_ID` | yes | Google OAuth client ID; ID tokens must be issued for it |
+| `JWT_SECRET` | yes | Key used to sign session tokens (at least 32 bytes, random) |
+| `COOKIE_SECURE` | no (default `true`) | Set `false` only for local http development |
+| `CORS_ALLOWED_ORIGINS` | no | Comma-separated web origins allowed to call the API with cookies (default: `http://localhost:3000,http://localhost:3001`) |
+| `PORT` | no (default `8081`) | HTTP port (8080 is commonly taken, e.g. by IIS on Windows) |
+
+Example `.env` (never commit it):
+
+```
+DB_URL=jdbc:postgresql://<host>:5432/postgres
+DB_USER=<user>
+DB_PASSWORD=<password>
+GOOGLE_CLIENT_ID=<client id>
+JWT_SECRET=<long random string>
+COOKIE_SECURE=false
+```
 
 Override the port for one run:
 
@@ -114,29 +139,36 @@ Override the port for one run:
 $env:PORT = "9000"; .\mvnw.cmd spring-boot:run
 ```
 
-Anything secret (database URL and credentials, Google client ID configuration, signing keys, AI keys) must come from
-environment variables, never from a committed file. See [Security and secrets](#security-and-secrets).
-
 ## Project structure
 
 ```
 fitfam-api/
 ├── pom.xml                         Maven build (Java 21, Spring Boot 4.1.1)
 ├── mvnw, mvnw.cmd, .mvn/           Maven wrapper
-├── src/
-│   ├── main/
-│   │   ├── java/com/fitfam/api/
-│   │   │   ├── FitfamApiApplication.java    Spring Boot entry point
-│   │   │   └── HealthController.java        GET /health
-│   │   └── resources/
-│   │       └── application.properties
-│   └── test/java/com/fitfam/api/
-│       ├── FitfamApiApplicationTests.java   Context loads
-│       └── HealthControllerTests.java       /health returns {"status":"ok"} (MockMvc)
+├── src/main/
+│   ├── java/com/fitfam/api/
+│   │   ├── FitfamApiApplication.java    Entry point
+│   │   ├── HealthController.java        GET /health
+│   │   ├── config/                      AppProperties, SecurityConfig (stateless auth, CORS)
+│   │   ├── auth/                        Google token verification, session token + cookie, login endpoints
+│   │   ├── admin/                       Admin endpoints and services, audit log
+│   │   ├── domain/                      JPA entities and repositories
+│   │   └── web/                         Error handling (ApiException)
+│   └── resources/
+│       ├── application.properties
+│       └── db/migration/V1__init.sql    Database schema (Flyway)
+├── src/test/                       Unit and web-layer tests (no real database or Google needed)
 └── .gitignore                      Ignores build output, IDE files, env files, keys, logs
 ```
 
 Base package: `com.fitfam.api`.
+
+## Database
+
+The schema lives in `src/main/resources/db/migration/` (Flyway). The first version was applied by hand, so Flyway is
+configured to baseline at version 1; later changes are added as `V2__...sql`, `V3__...sql` and so on. Hibernate runs in
+`validate` mode, so the app refuses to start if the entities and the tables disagree. Row Level Security is enabled on
+every table with no policies: only this service's database connection can read or write.
 
 ## Testing
 
@@ -144,7 +176,8 @@ Base package: `com.fitfam.api`.
 ./mvnw test          # Windows PowerShell: .\mvnw.cmd test
 ```
 
-Current tests: the application context loads, and `/health` returns `200` with `{"status":"ok"}`.
+Tests cover session tokens, the login rules (pre-approved email only, verified email required), admin authorization, adding
+users with plans, CORS and the cookie flags. They use mocks and never touch a real database or Google.
 
 ## Windows troubleshooting
 
@@ -173,9 +206,9 @@ dependencies are cached in `~/.m2`, normal runs do not need it.
   Supabase key.
 - All AI provider calls will be made server-side here, so AI keys are never exposed to a client.
 
-## Planned architecture
+## Architecture and decisions
 
-These are design decisions already made but **not yet implemented**:
+Design decisions. Items marked *(planned)* are not implemented yet:
 
 - **Auth: Google Sign-In only, permanently.** No other providers, no email/password, no Supabase Auth.
   - The web app obtains a Google ID token and sends it to the API.
@@ -188,8 +221,8 @@ These are design decisions already made but **not yet implemented**:
   - Web and API will share a parent domain (as subdomains) so cookies work.
 - **Database:** Supabase Postgres, accessed only from this service via JDBC and Spring Data JPA / Hibernate. The schema
   will be expressed as JPA entities. Row Level Security enabled on every table with no public policies.
-- **OpenAPI:** springdoc-openapi will publish the spec; the web app's TypeScript client/types will be generated from it.
-- **Account deletion:** an endpoint that cascades will be provided.
+- **OpenAPI** *(planned)*: springdoc-openapi will publish the spec; the web app's TypeScript client/types will be generated from it.
+- **Account deletion** *(planned)*: an endpoint that cascades will be provided.
 - **Business logic lives here only**, never in the frontends.
 
 The data model is not designed yet.
@@ -198,10 +231,12 @@ The data model is not designed yet.
 
 - [x] Spring Boot scaffold (Java 21, Maven)
 - [x] `GET /health`
-- [ ] Database connection and first entities
-- [ ] Google ID token verification and restricted login
-- [ ] Session cookie, `me` and `logout`
+- [x] Database connection (Postgres, JPA, Flyway)
+- [x] Google ID token verification and restricted login
+- [x] Session cookie, `me` and `logout`
+- [x] Admin endpoints to pre-approve users and enroll them in plans
 - [ ] springdoc-openapi and generated TypeScript client
+- [ ] Account deletion
 - [ ] Core domain features
 - [ ] Deployment to Railway
 - [ ] AI features (server-side only)
