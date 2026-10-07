@@ -208,11 +208,25 @@ nothing.
 - **Never commit secrets.** `.gitignore` excludes `.env`, `.env.*`, key and certificate files (`*.pem`, `*.key`, `*.p12`,
   `*.pfx`, `*.jks`, `*.keystore`), `application-local*` / `application-secret*` Spring config files, and logs.
 - `application.properties` is tracked: it must contain **no** secrets, only safe defaults and `${ENV_VAR}` references.
-- In production, secrets live only in Railway environment variables. Locally, use a gitignored `.env`-style file or your
-  shell environment.
-- The database is reachable **only** from this service. The frontend never talks to the database and never uses a
-  Supabase key.
-- All AI provider calls will be made server-side here, so AI keys are never exposed to a client.
+- In production, secrets live only in the host's environment variables. Locally, use a gitignored `.env` file.
+- **Access control:** everything except the health check, login and logout needs a valid session; `/admin/**` needs the
+  admin role. The user and role are re-read from the database on every request, so removing or demoting someone applies
+  at once. Forged, unsigned, tampered, wrongly signed and expired tokens are rejected (unit tests plus live checks).
+- **Sessions:** a signed token in an `HttpOnly`, `SameSite=Lax` cookie. Customers get 7 days, admins 12 hours
+  (`app.session.admin-hours`). Sessions are stateless, so there is no server-side "log out everywhere".
+- **Browser-facing headers** on every response: CSP `default-src 'none'; frame-ancestors 'none'`, `X-Frame-Options: DENY`,
+  `nosniff`, `Referrer-Policy: no-referrer`, HSTS, `no-store`. Only the health check is exposed by Actuator, and errors
+  never include messages or stack traces.
+- **CORS** uses an allowlist. The app refuses to start if `COOKIE_SECURE` is on (a real deployment) while
+  `CORS_ALLOWED_ORIGINS` still contains localhost or a plain-http origin.
+- **Database:** only this service (the database owner) reads or writes our tables. Row Level Security is on for every
+  table with no policies, and `V2__lock_down_public_roles.sql` removes all table/sequence/function access from the
+  database host's public-facing roles (`anon`, `authenticated`), including for tables created later. On a new database,
+  also run `alter table public.flyway_schema_history enable row level security;` once while the API is stopped (Flyway
+  cannot alter its own history table while it runs).
+- **Input safety:** all SQL uses bound parameters; the only dynamic SQL is assembled from fixed fragments (the waitlist
+  filters), and a test checks that hostile input is never concatenated.
+- All AI provider calls (when added) are made server-side here, so AI keys are never exposed to a client.
 
 ## Architecture and decisions
 

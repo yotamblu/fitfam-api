@@ -1,5 +1,6 @@
 package com.fitfam.api.auth;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
 
@@ -14,7 +15,7 @@ import com.fitfam.api.web.ApiException;
 @Service
 public class AuthService {
 
-	public record LoginResult(User user, String token) {
+	public record LoginResult(User user, String token, Duration lifetime) {
 	}
 
 	private final GoogleTokenVerifier verifier;
@@ -55,7 +56,8 @@ public class AuthService {
 		}
 		users.save(user);
 
-		return new LoginResult(user, tokens.issue(user.getId()));
+		Duration lifetime = tokens.lifetimeFor(user.getRole());
+		return new LoginResult(user, tokens.issue(user.getId(), lifetime), lifetime);
 	}
 
 	private static boolean isBlank(String value) {

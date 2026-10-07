@@ -14,6 +14,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -38,6 +40,14 @@ public class SecurityConfig {
 				.formLogin(AbstractHttpConfigurer::disable)
 				.httpBasic(AbstractHttpConfigurer::disable)
 				.logout(AbstractHttpConfigurer::disable)
+				// This API only returns JSON: nothing may be framed, scripted or sniffed, and nothing leaks via Referer.
+				.headers(headers -> headers
+						.contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
+						.referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER))
+						.httpStrictTransportSecurity(hsts -> hsts
+								.requestMatcher(AnyRequestMatcher.INSTANCE)
+								.maxAgeInSeconds(31_536_000)
+								.includeSubDomains(true)))
 				.exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/health", "/actuator/health", "/actuator/health/**").permitAll()
@@ -50,6 +60,7 @@ public class SecurityConfig {
 
 	@Bean
 	CorsConfigurationSource corsConfigurationSource(AppProperties props) {
+		requireSafeCorsForProduction(props.cookie().secure(), props.cors().allowedOrigins());
 		CorsConfiguration config = new CorsConfiguration();
 		config.setAllowedOrigins(props.cors().allowedOrigins());
 		config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
@@ -59,6 +70,23 @@ public class SecurityConfig {
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", config);
 		return source;
+	}
+
+	/**
+	 * Secure cookies mean a real (https) deployment. In that case the CORS allowlist must not contain localhost or
+	 * plain http origins (the development default), because origins listed there may call the API with the cookie.
+	 */
+	static void requireSafeCorsForProduction(boolean secureCookies, java.util.List<String> allowedOrigins) {
+		if (!secureCookies) {
+			return;
+		}
+		for (String origin : allowedOrigins) {
+			if (!origin.startsWith("https://")) {
+				throw new IllegalStateException(
+						"Refusing to start: COOKIE_SECURE is on but CORS_ALLOWED_ORIGINS contains a non-https origin ("
+								+ origin + "). Set CORS_ALLOWED_ORIGINS to the real https sites.");
+			}
+		}
 	}
 
 }

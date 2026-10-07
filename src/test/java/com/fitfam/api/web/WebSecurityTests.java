@@ -67,7 +67,7 @@ class WebSecurityTests {
 	}
 
 	private Cookie sessionFor(User user) {
-		return new Cookie(SessionCookies.NAME, tokens.issue(user.getId()));
+		return new Cookie(SessionCookies.NAME, tokens.issue(user.getId(), tokens.lifetimeFor(user.getRole())));
 	}
 
 	@Test
@@ -75,6 +75,17 @@ class WebSecurityTests {
 		mvc.perform(get("/health"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("ok"));
+	}
+
+	@Test
+	void responsesCarryBrowserSecurityHeaders() throws Exception {
+		mvc.perform(get("/health"))
+				.andExpect(header().string("X-Frame-Options", "DENY"))
+				.andExpect(header().string("X-Content-Type-Options", "nosniff"))
+				.andExpect(header().string("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"))
+				.andExpect(header().string("Referrer-Policy", "no-referrer"))
+				.andExpect(header().exists("Strict-Transport-Security"))
+				.andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
 	}
 
 	@Test
@@ -153,7 +164,8 @@ class WebSecurityTests {
 	@Test
 	void googleLoginSetsAnHttpOnlySessionCookie() throws Exception {
 		User user = userWithRole(User.ROLE_CUSTOMER);
-		when(authService.login("good")).thenReturn(new AuthService.LoginResult(user, tokens.issue(user.getId())));
+		when(authService.login("good")).thenReturn(new AuthService.LoginResult(user, tokens.issue(user.getId(), tokens.lifetimeFor(user.getRole())),
+				tokens.lifetimeFor(user.getRole())));
 
 		mvc.perform(post("/auth/google").contentType(MediaType.APPLICATION_JSON).content("{\"credential\":\"good\"}"))
 				.andExpect(status().isOk())

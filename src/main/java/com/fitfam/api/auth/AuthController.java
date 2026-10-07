@@ -26,12 +26,10 @@ public class AuthController {
 	}
 
 	private final AuthService authService;
-	private final SessionTokenService tokens;
 	private final SessionCookies cookies;
 
-	public AuthController(AuthService authService, SessionTokenService tokens, SessionCookies cookies) {
+	public AuthController(AuthService authService, SessionCookies cookies) {
 		this.authService = authService;
-		this.tokens = tokens;
 		this.cookies = cookies;
 	}
 
@@ -39,7 +37,7 @@ public class AuthController {
 	public ResponseEntity<CurrentUserResponse> google(@Valid @RequestBody GoogleLoginRequest request) {
 		AuthService.LoginResult result = authService.login(request.credential());
 		return ResponseEntity.ok()
-				.header(HttpHeaders.SET_COOKIE, cookies.create(result.token(), tokens.lifetime()).toString())
+				.header(HttpHeaders.SET_COOKIE, cookies.create(result.token(), result.lifetime()).toString())
 				.body(CurrentUserResponse.of(AuthenticatedUser.of(result.user())));
 	}
 

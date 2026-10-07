@@ -13,7 +13,7 @@ public record AppProperties(Google google, Jwt jwt, Session session, Cookie cook
 	public record Jwt(String secret) {
 	}
 
-	public record Session(int days) {
+	public record Session(int days, int adminHours) {
 	}
 
 	public record Cookie(boolean secure) {

@@ -38,7 +38,7 @@ class AuthServiceTests {
 	@BeforeEach
 	void setUp() {
 		tokens = new SessionTokenService(new AppProperties(new AppProperties.Google("x"),
-				new AppProperties.Jwt("a-test-secret-that-is-long-enough-for-hs256"), new AppProperties.Session(7),
+				new AppProperties.Jwt("a-test-secret-that-is-long-enough-for-hs256"), new AppProperties.Session(7, 12),
 				new AppProperties.Cookie(false), new AppProperties.Cors(List.of())));
 		googleUser = new VerifiedGoogleUser("Alice@Example.com ", true, "Alice", "http://img/alice.png");
 		service = new AuthService(credential -> "good".equals(credential) ? Optional.of(googleUser) : Optional.empty(),

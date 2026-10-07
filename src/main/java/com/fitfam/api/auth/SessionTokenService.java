@@ -12,6 +12,7 @@ import javax.crypto.SecretKey;
 import org.springframework.stereotype.Service;
 
 import com.fitfam.api.config.AppProperties;
+import com.fitfam.api.domain.User;
 
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -23,6 +24,7 @@ public class SessionTokenService {
 
 	private final SecretKey key;
 	private final Duration lifetime;
+	private final Duration adminLifetime;
 
 	public SessionTokenService(AppProperties props) {
 		byte[] secret = props.jwt().secret().getBytes(StandardCharsets.UTF_8);
@@ -31,13 +33,15 @@ public class SessionTokenService {
 		}
 		this.key = Keys.hmacShaKeyFor(secret);
 		this.lifetime = Duration.ofDays(props.session().days());
+		this.adminLifetime = Duration.ofHours(props.session().adminHours());
 	}
 
-	public Duration lifetime() {
-		return lifetime;
+	/** How long a session lasts for this role. Admins get a much shorter one. */
+	public Duration lifetimeFor(String role) {
+		return User.ROLE_ADMIN.equals(role) ? adminLifetime : lifetime;
 	}
 
-	public String issue(UUID userId) {
+	public String issue(UUID userId, Duration lifetime) {
 		Instant now = Instant.now();
 		return Jwts.builder()
 				.subject(userId.toString())

@@ -39,7 +39,7 @@ logs and `/db-local/`.
 ## Commands
 - Run: `./mvnw -Djava.version=17 spring-boot:run` (PowerShell: `.\mvnw.cmd ...`); check `curl localhost:8081/health`.
   Drop `-Djava.version=17` once JDK 21 is installed (this machine has only JDK 17; the code needs nothing newer).
-- Test: `./mvnw -Djava.version=17 test` (37 tests; mocks only, no real DB or Google needed).
+- Test: `./mvnw -Djava.version=17 test` (43 tests; mocks only, no real DB or Google needed).
 
 ## Windows gotchas
 - `PKIX path building failed` while Maven downloads: run Maven with
@@ -48,6 +48,18 @@ logs and `/db-local/`.
 - The same problem broke fetching Google's keys at runtime (login returned 503 `google_unavailable`). The
   `windows-truststore` profile in `pom.xml` fixes it for `spring-boot:run` on Windows; Linux/production is unaffected.
 - Port 8080 is taken by IIS on the dev machine, hence the default 8081.
+
+## Security rules (audited 2026-10-07)
+- Keep every new route under authentication by default (`anyRequest().authenticated()`); put admin-only routes under
+  `/admin/**`. Never expose more Actuator endpoints than `health`. Never return exception messages to clients.
+- Admin sessions are short (`app.session.admin-hours`, 12) because tokens cannot be revoked server-side; the user and
+  role are reloaded per request, so deleting or demoting a user is an instant lockout.
+- Keep the response headers in `SecurityConfig` (CSP, frame, referrer, HSTS). `requireSafeCorsForProduction` makes the
+  app refuse to start with secure cookies plus a non-https/localhost CORS origin; set `CORS_ALLOWED_ORIGINS` in prod.
+- Migrations must keep `anon`/`authenticated` without any access (V2). New tables get no grants for them by default
+  (default privileges are revoked). Do not alter `flyway_schema_history` inside a migration (it deadlocks on Flyway's
+  own lock): enable its RLS manually on a new database.
+- All SQL via bound parameters. No string-concatenated user input, ever.
 
 ## Before pushing
 Scan the commits for real secret values and business details. Do not push without being asked.
