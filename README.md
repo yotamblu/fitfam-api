@@ -102,6 +102,7 @@ Stop the app with **Ctrl+C**.
 | `GET` | `/admin/plans` | admin | Available plans and their levels |
 | `GET` | `/admin/users` | admin | Users with their enrollments |
 | `POST` | `/admin/users` | admin | Pre-approve a user by email and enroll them in plans |
+| `GET` | `/admin/waitlist?page=&size=` | admin | Read-only, paginated list of waitlist signups (newest first) with a flag for emails that already have an account |
 
 Errors are returned as `{"error": "<code>"}` (for example `invalid_token`, `not_invited`, `email_exists`).
 
@@ -151,7 +152,7 @@ fitfam-api/
 │   │   ├── HealthController.java        GET /health
 │   │   ├── config/                      AppProperties, SecurityConfig (stateless auth, CORS)
 │   │   ├── auth/                        Google token verification, session token + cookie, login endpoints
-│   │   ├── admin/                       Admin endpoints and services, audit log
+│   │   ├── admin/                       Admin endpoints and services, audit log, waitlist reader
 │   │   ├── domain/                      JPA entities and repositories
 │   │   └── web/                         Error handling (ApiException)
 │   └── resources/

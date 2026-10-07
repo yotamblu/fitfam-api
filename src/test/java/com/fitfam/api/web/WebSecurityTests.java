@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,7 +26,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.fitfam.api.HealthController;
 import com.fitfam.api.admin.AdminController;
 import com.fitfam.api.admin.AdminDtos.CustomerDto;
+import com.fitfam.api.admin.AdminDtos.WaitlistEntryDto;
+import com.fitfam.api.admin.AdminDtos.WaitlistPageDto;
 import com.fitfam.api.admin.AdminUserService;
+import com.fitfam.api.admin.WaitlistService;
 import com.fitfam.api.auth.AuthController;
 import com.fitfam.api.auth.AuthService;
 import com.fitfam.api.auth.SessionCookies;
@@ -51,6 +55,8 @@ class WebSecurityTests {
 	private AuthService authService;
 	@MockitoBean
 	private AdminUserService adminService;
+	@MockitoBean
+	private WaitlistService waitlistService;
 
 	private User userWithRole(String role) {
 		User user = new User(role + "@example.com", role, User.STATUS_ACTIVE);
@@ -109,6 +115,23 @@ class WebSecurityTests {
 				.andExpect(status().isForbidden());
 		mvc.perform(get("/admin/users").cookie(sessionFor(userWithRole(User.ROLE_ADMIN))))
 				.andExpect(status().isOk());
+	}
+
+	@Test
+	void waitlistIsForAdminsOnly() throws Exception {
+		when(waitlistService.list(0, 50)).thenReturn(new WaitlistPageDto(1, 0, 50, List.of(
+				new WaitlistEntryDto("w1", "wait@example.com", "running", Instant.parse("2026-01-02T03:04:05Z"), false))));
+
+		mvc.perform(get("/admin/waitlist")).andExpect(status().isUnauthorized());
+		mvc.perform(get("/admin/waitlist").cookie(sessionFor(userWithRole(User.ROLE_CUSTOMER))))
+				.andExpect(status().isForbidden());
+		mvc.perform(get("/admin/waitlist").cookie(sessionFor(userWithRole(User.ROLE_ADMIN))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.total").value(1))
+				.andExpect(jsonPath("$.items[0].email").value("wait@example.com"))
+				.andExpect(jsonPath("$.items[0].favoriteSport").value("running"))
+				.andExpect(jsonPath("$.items[0].createdAt").value("2026-01-02T03:04:05Z"))
+				.andExpect(jsonPath("$.items[0].alreadyUser").value(false));
 	}
 
 	@Test

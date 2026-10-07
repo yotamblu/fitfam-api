@@ -23,6 +23,10 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
 - `/admin/**` requires `role = 'admin'`. CSRF protection relies on SameSite=Lax + the CORS allowlist + JSON-only
   bodies; keep state-changing endpoints POST/PUT/DELETE with JSON.
 - Errors are `{"error": "<code>"}` via `ApiException` / `ApiExceptionHandler`.
+- `GET /admin/waitlist` (admin only) reads `waitlist_signups`, a table written by a separate public waitlist site in
+  the same database. `WaitlistService` only ever SELECTs, with plain SQL via `JdbcTemplate` (not a JPA entity), so a
+  change to that table cannot stop the API from starting; it returns 503 `waitlist_unavailable` if the table is gone.
+  Never expose its `ip_hash` or `user_agent` columns. Page size is clamped to 200.
 
 ## Config (env vars; locally from the gitignored `.env`)
 `DB_URL`, `DB_USER`, `DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `JWT_SECRET` (>= 32 bytes), `COOKIE_SECURE` (`false` for local
@@ -33,7 +37,7 @@ logs and `/db-local/`.
 ## Commands
 - Run: `./mvnw -Djava.version=17 spring-boot:run` (PowerShell: `.\mvnw.cmd ...`); check `curl localhost:8081/health`.
   Drop `-Djava.version=17` once JDK 21 is installed (this machine has only JDK 17; the code needs nothing newer).
-- Test: `./mvnw -Djava.version=17 test` (28 tests; mocks only, no real DB or Google needed).
+- Test: `./mvnw -Djava.version=17 test` (32 tests; mocks only, no real DB or Google needed).
 
 ## Windows gotchas
 - `PKIX path building failed` while Maven downloads: run Maven with

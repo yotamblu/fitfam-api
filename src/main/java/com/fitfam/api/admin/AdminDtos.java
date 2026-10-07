@@ -27,6 +27,14 @@ public final class AdminDtos {
 			String levelNameHe, String status) {
 	}
 
+	/** One waitlist signup. Only what admins need: the hashed IP and user agent stored with it are never exposed. */
+	public record WaitlistEntryDto(String id, String email, String favoriteSport, Instant createdAt,
+			boolean alreadyUser) {
+	}
+
+	public record WaitlistPageDto(long total, int page, int size, List<WaitlistEntryDto> items) {
+	}
+
 	public record CustomerDto(String id, String email, String role, String status, String displayName,
 			Instant firstLoginAt, List<EnrollmentDto> enrollments) {
 	}
