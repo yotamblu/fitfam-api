@@ -102,7 +102,7 @@ Stop the app with **Ctrl+C**.
 | `GET` | `/admin/plans` | admin | Available plans and their levels |
 | `GET` | `/admin/users` | admin | Users with their enrollments |
 | `POST` | `/admin/users` | admin | Pre-approve a user by email and enroll them in plans |
-| `GET` | `/admin/waitlist?page=&size=` | admin | Read-only, paginated list of waitlist signups (newest first) with a flag for emails that already have an account |
+| `GET` | `/admin/waitlist` | admin | Read-only, paginated list of waitlist signups (newest first) with a flag for emails that already have an account. Query params: `page`, `size`, `q` (search in the email), `status=waiting` (only those without an account), `sport`. The response also carries a `summary` with whole-list totals (signed up, already users, count per sport) that ignores the filters |
 
 Errors are returned as `{"error": "<code>"}` (for example `invalid_token`, `not_invited`, `email_exists`).
 

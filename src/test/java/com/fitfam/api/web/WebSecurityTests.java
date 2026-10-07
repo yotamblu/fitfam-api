@@ -28,6 +28,7 @@ import com.fitfam.api.admin.AdminController;
 import com.fitfam.api.admin.AdminDtos.CustomerDto;
 import com.fitfam.api.admin.AdminDtos.WaitlistEntryDto;
 import com.fitfam.api.admin.AdminDtos.WaitlistPageDto;
+import com.fitfam.api.admin.AdminDtos.WaitlistSummaryDto;
 import com.fitfam.api.admin.AdminUserService;
 import com.fitfam.api.admin.WaitlistService;
 import com.fitfam.api.auth.AuthController;
@@ -119,8 +120,9 @@ class WebSecurityTests {
 
 	@Test
 	void waitlistIsForAdminsOnly() throws Exception {
-		when(waitlistService.list(0, 50)).thenReturn(new WaitlistPageDto(1, 0, 50, List.of(
-				new WaitlistEntryDto("w1", "wait@example.com", "running", Instant.parse("2026-01-02T03:04:05Z"), false))));
+		when(waitlistService.list(0, 50, null, null, null)).thenReturn(new WaitlistPageDto(1, 0, 50, List.of(
+				new WaitlistEntryDto("w1", "wait@example.com", "running", Instant.parse("2026-01-02T03:04:05Z"), false)),
+				new WaitlistSummaryDto(1, 0, java.util.Map.of("running", 1L))));
 
 		mvc.perform(get("/admin/waitlist")).andExpect(status().isUnauthorized());
 		mvc.perform(get("/admin/waitlist").cookie(sessionFor(userWithRole(User.ROLE_CUSTOMER))))
@@ -131,7 +133,21 @@ class WebSecurityTests {
 				.andExpect(jsonPath("$.items[0].email").value("wait@example.com"))
 				.andExpect(jsonPath("$.items[0].favoriteSport").value("running"))
 				.andExpect(jsonPath("$.items[0].createdAt").value("2026-01-02T03:04:05Z"))
-				.andExpect(jsonPath("$.items[0].alreadyUser").value(false));
+				.andExpect(jsonPath("$.items[0].alreadyUser").value(false))
+				.andExpect(jsonPath("$.summary.total").value(1))
+				.andExpect(jsonPath("$.summary.bySport.running").value(1));
+	}
+
+	@Test
+	void waitlistSearchAndFiltersArePassedThrough() throws Exception {
+		when(waitlistService.list(1, 20, "ann", "waiting", "running")).thenReturn(new WaitlistPageDto(0, 1, 20,
+				List.of(), new WaitlistSummaryDto(0, 0, java.util.Map.of())));
+
+		mvc.perform(get("/admin/waitlist").param("page", "1").param("size", "20").param("q", "ann")
+				.param("status", "waiting").param("sport", "running")
+				.cookie(sessionFor(userWithRole(User.ROLE_ADMIN))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.page").value(1));
 	}
 
 	@Test

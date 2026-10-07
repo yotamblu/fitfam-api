@@ -43,8 +43,11 @@ public class AdminController {
 
 	@GetMapping("/admin/waitlist")
 	public WaitlistPageDto waitlist(@RequestParam(defaultValue = "0") int page,
-			@RequestParam(defaultValue = "50") int size) {
-		return waitlist.list(page, size);
+			@RequestParam(defaultValue = "50") int size,
+			@RequestParam(required = false) String q,
+			@RequestParam(required = false) String status,
+			@RequestParam(required = false) String sport) {
+		return waitlist.list(page, size, q, status, sport);
 	}
 
 	@PostMapping("/admin/users")

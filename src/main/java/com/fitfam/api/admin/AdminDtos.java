@@ -32,7 +32,13 @@ public final class AdminDtos {
 			boolean alreadyUser) {
 	}
 
-	public record WaitlistPageDto(long total, int page, int size, List<WaitlistEntryDto> items) {
+	/** Totals over the whole waitlist (not just the current filter). {@code bySport} keys are sport ids or "none". */
+	public record WaitlistSummaryDto(long total, long alreadyUsers, java.util.Map<String, Long> bySport) {
+	}
+
+	/** {@code total} is the number of rows matching the current search/filter, for paging. */
+	public record WaitlistPageDto(long total, int page, int size, List<WaitlistEntryDto> items,
+			WaitlistSummaryDto summary) {
 	}
 
 	public record CustomerDto(String id, String email, String role, String status, String displayName,
