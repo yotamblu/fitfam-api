@@ -1,0 +1,32 @@
+# Keep secrets, local data and build output out of the image and the build context.
+.git
+.gitignore
+.gitattributes
+target
+.idea
+.vscode
+*.iml
+
+# secrets and local-only files (never copy into an image)
+.env
+.env.*
+db-local
+application-local*
+application-secret*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.log
+
+# not needed to build
+mvnw
+mvnw.cmd
+.mvn
+README.md
+CLAUDE.md
+Dockerfile
+.dockerignore
+render.yaml

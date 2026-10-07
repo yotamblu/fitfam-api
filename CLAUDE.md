@@ -41,6 +41,17 @@ logs and `/db-local/`.
   Drop `-Djava.version=17` once JDK 21 is installed (this machine has only JDK 17; the code needs nothing newer).
 - Test: `./mvnw -Djava.version=17 test` (43 tests; mocks only, no real DB or Google needed).
 
+## Deployment (Render free plan)
+- Render builds from GitHub using `Dockerfile` + `render.yaml` (Blueprint: free plan, Frankfurt, `/health`). The image
+  must never contain secrets: `.dockerignore` excludes `.env*`, `db-local`, keys. Settings come from environment
+  variables (`DB_URL`, `DB_USER`, `DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `CORS_ALLOWED_ORIGINS`; `JWT_SECRET` is generated
+  by Render; `COOKIE_SECURE=true`). `PORT` is set by Render and read by `server.port`.
+- `CORS_ALLOWED_ORIGINS` must be https-only in production or the app refuses to start (intended).
+- Free plan facts: sleeps after 15 min idle (about a minute to wake), 512 MB RAM, small CPU share, 750 free hours per
+  month per workspace. JVM flags for that are in `render.yaml` (`JAVA_TOOL_OPTIONS`). Keep memory under ~400 MB.
+- The Docker image itself has NOT been built locally (no Docker on the dev machine); the jar, the production settings,
+  the port and the memory were simulated locally instead. The first Render build is the real test.
+
 ## Windows gotchas
 - `PKIX path building failed` while Maven downloads: run Maven with
   `MAVEN_OPTS="-Djavax.net.ssl.trustStoreType=Windows-ROOT -Djavax.net.ssl.trustStore=NUL"`. Only needed when new
