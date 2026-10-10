@@ -45,6 +45,10 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
   `/admin/levels/{id}/workouts[/order]`, `/admin/workouts/{id}[/publish|unpublish|archive|restore|duplicate|steps]`);
   customer endpoints in `TrainingController` (`/me/plans`, `/me/plans/{slug}/roadmap`, `/workouts/{id}[/steps|/progress|/complete]`,
   `/challenges/{id}/attempt`). A level has at most one live challenge and it is always last in the order.
+- Block style `endurance` (plain running / swimming): its lines have NO bank exercise. A line is `{activity: run|swim, reps?
+  (repeat), distanceM XOR durationSec (one required), zone 1-5, rpe 1-10, restSec, notesHe}`; `enduranceLine` in the validator
+  enforces it and `StepExpander.endurance` unfolds it (repeat + rest steps, target named by the built-in ref `builtin:run` /
+  `builtin:swim` with measure distance/duration), so clients play it like any other work step.
 - Known quirk: live, a logged-in non-admin on `/admin/**` receives 401, not 403 (error dispatch loses the session); the
   MockMvc test sees 403. Access is denied either way.
 
@@ -57,7 +61,7 @@ logs and `/db-local/`.
 ## Commands
 - Run: `./mvnw -Djava.version=17 spring-boot:run` (PowerShell: `.\mvnw.cmd ...`); check `curl localhost:8081/health`.
   Drop `-Djava.version=17` once JDK 21 is installed (this machine has only JDK 17; the code needs nothing newer).
-- Test: `./mvnw -Djava.version=17 test` (89 tests; mocks only, no real DB or Google needed).
+- Test: `./mvnw -Djava.version=17 test` (92 tests; mocks only, no real DB or Google needed).
 
 ## Deployment (Render free plan)
 - Render builds from GitHub using `Dockerfile` + `render.yaml` (Blueprint: free plan, Frankfurt, `/health`). The image

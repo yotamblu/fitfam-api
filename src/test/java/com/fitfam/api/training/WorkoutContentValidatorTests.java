@@ -116,6 +116,37 @@ class WorkoutContentValidatorTests {
 	}
 
 	@Test
+	void enduranceBlocksTakePlainRunAndSwimLinesWithoutAnExercise() {
+		String run = "{\"activity\":\"run\",\"reps\":5,\"durationSec\":180,\"zone\":4,\"rpe\":8,\"restSec\":120}";
+		JsonNode out = validator.validate(json(content("endurance", "", run)), true);
+		JsonNode line = out.at("/sections/0/blocks/0/lines/0");
+		assertThat(line.get("activity").stringValue()).isEqualTo("run");
+		assertThat(line.get("zone").intValue()).isEqualTo(4);
+		assertThat(line.has("exerciseId")).isFalse();
+		assertThat(WorkoutContentValidator.countLines(out)).isEqualTo(1);
+		String swim = "{\"activity\":\"swim\",\"distanceM\":1500,\"zone\":2}";
+		assertThat(validator.validate(json(content("endurance", "", swim)), true)).isNotNull();
+	}
+
+	@Test
+	void enduranceLinesNeedAnActivityAndExactlyOneOfDistanceOrDuration() {
+		assertInvalid(content("endurance", "", "{\"distanceM\":400}"), false,
+				"sections[0].blocks[0].lines[0].activity:required");
+		assertInvalid(content("endurance", "", "{\"activity\":\"bike\",\"distanceM\":400}"), false,
+				"sections[0].blocks[0].lines[0].activity:invalid");
+		assertInvalid(content("endurance", "", "{\"activity\":\"run\"}"), false,
+				"sections[0].blocks[0].lines[0].distanceM:required");
+		assertInvalid(content("endurance", "", "{\"activity\":\"run\",\"distanceM\":400,\"durationSec\":60}"), false,
+				"sections[0].blocks[0].lines[0].durationSec:not_allowed_with_distance");
+		assertInvalid(content("endurance", "", "{\"activity\":\"run\",\"distanceM\":400,\"zone\":6}"), false,
+				"sections[0].blocks[0].lines[0].zone:out_of_range");
+		assertInvalid(content("endurance", "", "{\"exerciseId\":\"" + repsId + "\",\"activity\":\"run\",\"distanceM\":400}"),
+				false, "sections[0].blocks[0].lines[0].exerciseId:not_allowed");
+		assertInvalid(content("straight", "", "{\"activity\":\"run\",\"distanceM\":400}"), false,
+				"sections[0].blocks[0].lines[0].exerciseId:invalid");
+	}
+
+	@Test
 	void zoneAndRpeStayInTheirScales() {
 		String zone6 = "{\"exerciseId\":\"" + distanceId + "\",\"distanceM\":400,\"zone\":6}";
 		assertInvalid(content("straight", "", zone6), false, "sections[0].blocks[0].lines[0].zone:out_of_range");

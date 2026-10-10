@@ -33,7 +33,11 @@ public class WorkoutContentValidator {
 	static final int MAX_BLOCKS = 20;
 	static final int MAX_LINES = 30;
 
-	static final Set<String> STYLES = Set.of("straight", "circuit", "amrap", "emom", "for_time");
+	static final Set<String> STYLES = Set.of("straight", "circuit", "amrap", "emom", "for_time", "endurance");
+
+	static final Set<String> ACTIVITIES = Set.of("run", "swim");
+	private static final Set<String> ENDURANCE_LINE = Set.of("id", "activity", "notesHe", "restSec", "reps", "distanceM",
+			"durationSec", "zone", "rpe");
 
 	private static final Set<String> LINE_BASE = Set.of("id", "exerciseId", "notesHe", "restSec");
 	private static final Map<String, Set<String>> LINE_EXTRA = Map.of(
@@ -55,7 +59,8 @@ public class WorkoutContentValidator {
 			"circuit", Set.of("rounds", "restBetweenLinesSec", "restBetweenRoundsSec"),
 			"amrap", Set.of("durationSec"),
 			"emom", Set.of("durationSec", "intervalSec"),
-			"for_time", Set.of("rounds", "capSec"));
+			"for_time", Set.of("rounds", "capSec"),
+				"endurance", Set.of());
 	private static final Set<String> BLOCK_BASE = Set.of("id", "style", "notes", "lines");
 
 	private final ExerciseService exercises;
@@ -204,7 +209,12 @@ public class WorkoutContentValidator {
 			throw invalid(path + ".lines", "invalid");
 		}
 		for (int l = 0; l < lines.size(); l++) {
-			line(lines.get(l), path + ".lines[" + l + "]", linesOut.addObject(), known, usedIds, forPublish);
+			if ("endurance".equals(style)) {
+				enduranceLine(lines.get(l), path + ".lines[" + l + "]", linesOut.addObject(), usedIds);
+			}
+			else {
+				line(lines.get(l), path + ".lines[" + l + "]", linesOut.addObject(), known, usedIds, forPublish);
+			}
 		}
 		return lines.size();
 	}
@@ -285,6 +295,40 @@ public class WorkoutContentValidator {
 		if (required != null && !out.has(required)) {
 			throw invalid(path + "." + required, "required");
 		}
+	}
+
+	/**
+	 * A line of an endurance block: plain running or swimming, no bank exercise. Exactly one of distance / duration,
+	 * optional repeat count, zone, RPE and rest.
+	 */
+	private void enduranceLine(JsonNode in, String path, ObjectNode out, Set<String> usedIds) {
+		if (!in.isObject()) {
+			throw invalid(path, "object_expected");
+		}
+		rejectUnknown(in, ENDURANCE_LINE, path);
+		JsonNode activityNode = in.get("activity");
+		String activity = activityNode != null && activityNode.isString() ? activityNode.stringValue() : null;
+		if (activity == null || !ACTIVITIES.contains(activity)) {
+			throw invalid(path + ".activity", activityNode == null || activityNode.isNull() ? "required" : "invalid");
+		}
+		out.put("id", id(in, path, usedIds));
+		out.put("activity", activity);
+		String notes = optionalString(in, "notesHe", path, 500);
+		if (notes != null) {
+			out.put("notesHe", notes);
+		}
+		copyInt(in, out, "restSec", path, 0, 3600, false);
+		copyInt(in, out, "reps", path, 1, 100, false);
+		copyInt(in, out, "distanceM", path, 1, 100000, false);
+		copyInt(in, out, "durationSec", path, 1, 14400, false);
+		if (out.has("distanceM") && out.has("durationSec")) {
+			throw invalid(path + ".durationSec", "not_allowed_with_distance");
+		}
+		if (!out.has("distanceM") && !out.has("durationSec")) {
+			throw invalid(path + ".distanceM", "required");
+		}
+		copyInt(in, out, "zone", path, 1, 5, false);
+		copyInt(in, out, "rpe", path, 1, 10, false);
 	}
 
 	private void collectExerciseIds(JsonNode sections, Set<UUID> into) {

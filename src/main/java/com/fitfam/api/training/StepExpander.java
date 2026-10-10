@@ -62,7 +62,9 @@ public class StepExpander {
 		for (JsonNode section : content.path("sections")) {
 			for (JsonNode block : section.path("blocks")) {
 				for (JsonNode line : block.path("lines")) {
-					ids.add(UUID.fromString(line.path("exerciseId").stringValue()));
+					if (line.path("exerciseId").isString()) {
+						ids.add(UUID.fromString(line.path("exerciseId").stringValue()));
+					}
 				}
 			}
 		}
@@ -77,7 +79,8 @@ public class StepExpander {
 				String style = block.path("style").stringValue();
 				String notes = textOrNull(block, "notes");
 				switch (style) {
-					case "circuit" -> circuit(block, sectionTitle, notes, known, steps);
+					case "endurance" -> endurance(block, sectionTitle, notes, steps);
+						case "circuit" -> circuit(block, sectionTitle, notes, known, steps);
 					case "amrap", "emom", "for_time" -> timed(block, style, sectionTitle, notes, known, steps);
 					default -> straight(block, sectionTitle, notes, known, steps);
 				}
@@ -108,6 +111,31 @@ public class StepExpander {
 				}
 			}
 		}
+	}
+
+	/** Plain running / swimming segments: each line repeats {@code reps} times, its rest follows every repeat. */
+	private void endurance(JsonNode block, String sectionTitle, String notes, List<Step> out) {
+		for (JsonNode line : block.path("lines")) {
+			Target target = enduranceTarget(line);
+			int count = line.path("reps").intValue(1);
+			int rest = line.path("restSec").intValue(0);
+			for (int i = 1; i <= count; i++) {
+				out.add(new Step(0, WORK, sectionTitle, "endurance", notes, i, count, null, null, null, null, null,
+						target, null));
+				if (rest > 0) {
+					out.add(restStep(rest, sectionTitle, "endurance", notes));
+				}
+			}
+		}
+	}
+
+	private static Target enduranceTarget(JsonNode line) {
+		boolean swim = "swim".equals(line.path("activity").stringValue());
+		boolean byDistance = line.has("distanceM");
+		ExerciseRef ref = new ExerciseRef(swim ? "builtin:swim" : "builtin:run", swim ? "שחייה" : "ריצה",
+				byDistance ? "distance" : "duration", null, null, null);
+		return new Target(ref, null, null, intOrNull(line, "durationSec"), intOrNull(line, "distanceM"), null, null,
+				intOrNull(line, "zone"), intOrNull(line, "rpe"), null, textOrNull(line, "notesHe"));
 	}
 
 	private void circuit(JsonNode block, String sectionTitle, String notes, Map<UUID, ExerciseInfo> known,

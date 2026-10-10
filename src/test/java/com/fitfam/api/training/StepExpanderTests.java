@@ -74,6 +74,26 @@ class StepExpanderTests {
 	}
 
 	@Test
+	void enduranceLinesUnfoldIntoRunAndSwimStepsWithZoneAndRpe() {
+		String run = "{\"activity\":\"run\",\"reps\":3,\"durationSec\":240,\"zone\":4,\"rpe\":8,\"restSec\":90}";
+		String swim = "{\"activity\":\"swim\",\"distanceM\":800,\"zone\":2}";
+		List<Step> steps = expand(block("endurance", "", run, swim));
+		assertThat(steps).extracting(Step::type).containsExactly("work", "rest", "work", "rest", "work", "rest", "work");
+		Step first = steps.get(0);
+		assertThat(first.blockStyle()).isEqualTo("endurance");
+		assertThat(first.setCount()).isEqualTo(3);
+		assertThat(first.target().exercise().nameHe()).isEqualTo("ריצה");
+		assertThat(first.target().exercise().measure()).isEqualTo("duration");
+		assertThat(first.target().durationSec()).isEqualTo(240);
+		assertThat(first.target().zone()).isEqualTo(4);
+		assertThat(first.target().rpe()).isEqualTo(8);
+		Step last = steps.get(steps.size() - 1);
+		assertThat(last.target().exercise().nameHe()).isEqualTo("שחייה");
+		assertThat(last.target().exercise().measure()).isEqualTo("distance");
+		assertThat(last.target().distanceM()).isEqualTo(800);
+	}
+
+	@Test
 	void circuitsGoRoundByRoundWithBlockRests() {
 		List<Step> steps = expand(block("circuit",
 				",\"rounds\":2,\"restBetweenLinesSec\":10,\"restBetweenRoundsSec\":60",
