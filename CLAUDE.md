@@ -30,6 +30,24 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
   from fixed SQL fragments with bound `?` parameters only (search uses `position()`, so `%` and `_` are not wildcards);
   keep it that way. The response includes a `summary` (whole-list totals) next to the filtered page.
 
+## Training content (package `com.fitfam.api.training`, migration V3)
+- Plain SQL via `JdbcTemplate` (no JPA entities for these tables), values always bound. Tables: `exercises` (bank, optional
+  `youtube_id`, archived flag), `workouts` (extended in V3: sport, status draft/published/archived, goal, content tree
+  in `details` jsonb), `workout_progress`, `challenge_attempts`.
+- `WorkoutContentValidator` checks and cleans the content tree (sections > blocks > lines); the allowed fields of a line
+  depend on its exercise's `measure`. Errors are `invalid_content` with a `detail` path (`ApiException` has an optional
+  detail). `YouTubeLinks` accepts only https YouTube hosts and keeps just the 11-char id.
+- `StepExpander` is the one place that unfolds a workout into the flat step list for the guided player. `ProgressService`
+  holds the customer rules (strict order within the current level, higher levels locked, completed workouts read-only,
+  skipped levels never get progress rows, challenge pass moves up one level or skips ahead). Keep `compute` free of the
+  database; it is unit tested in `RoadmapRulesTests`.
+- Admin endpoints live in `AdminTrainingController` (`/admin/exercises`, `/admin/training/plans`,
+  `/admin/levels/{id}/workouts[/order]`, `/admin/workouts/{id}[/publish|unpublish|archive|restore|duplicate|steps]`);
+  customer endpoints in `TrainingController` (`/me/plans`, `/me/plans/{slug}/roadmap`, `/workouts/{id}[/steps|/progress|/complete]`,
+  `/challenges/{id}/attempt`). A level has at most one live challenge and it is always last in the order.
+- Known quirk: live, a logged-in non-admin on `/admin/**` receives 401, not 403 (error dispatch loses the session); the
+  MockMvc test sees 403. Access is denied either way.
+
 ## Config (env vars; locally from the gitignored `.env`)
 `DB_URL`, `DB_USER`, `DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `JWT_SECRET` (>= 32 bytes), `COOKIE_SECURE` (`false` for local
 http), `CORS_ALLOWED_ORIGINS` (default `http://localhost:3000,http://localhost:3001`), `PORT` (default 8081).
@@ -39,7 +57,7 @@ logs and `/db-local/`.
 ## Commands
 - Run: `./mvnw -Djava.version=17 spring-boot:run` (PowerShell: `.\mvnw.cmd ...`); check `curl localhost:8081/health`.
   Drop `-Djava.version=17` once JDK 21 is installed (this machine has only JDK 17; the code needs nothing newer).
-- Test: `./mvnw -Djava.version=17 test` (43 tests; mocks only, no real DB or Google needed).
+- Test: `./mvnw -Djava.version=17 test` (89 tests; mocks only, no real DB or Google needed).
 
 ## Deployment (Render free plan)
 - Render builds from GitHub using `Dockerfile` + `render.yaml` (Blueprint: free plan, Frankfurt, `/health`). The image
