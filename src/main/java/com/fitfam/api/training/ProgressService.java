@@ -235,8 +235,10 @@ public class ProgressService {
 				else {
 					state = LOCKED;
 				}
-				boolean canAttempt = isChallenge && !isDone && ((number == current && previousDone)
-						|| (number > current && number < top));
+				// the challenge of a level below the top doubles as the test-out: passing it moves up one level
+				// whether or not the level's workouts were done; the top challenge needs everything before it
+				boolean canAttempt = isChallenge && !isDone
+						&& ((number == current && (previousDone || number < top)) || (number > current && number < top));
 				items.add(new RoadmapWorkoutDto(w.id().toString(), w.sortOrder(), w.type(), w.sport(), w.titleHe(),
 						w.estMinutes(), state, canAttempt));
 				previousDone = previousDone && isDone;

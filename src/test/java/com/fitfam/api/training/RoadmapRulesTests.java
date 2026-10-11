@@ -78,8 +78,10 @@ class RoadmapRulesTests {
 	}
 
 	@Test
-	void theCurrentChallengeCanBeAttemptedOnlyAfterEverythingBeforeIt() {
-		assertThat(find(ProgressService.compute(levels, workouts, done("w1a"), 1), "c1").canAttempt()).isFalse();
+	void theCurrentChallengeIsAlwaysAvailableToTestOutExceptOnTheTopLevel() {
+		assertThat(find(ProgressService.compute(levels, workouts, done("w1a"), 1), "c1").canAttempt()).isTrue();
+		assertThat(find(ProgressService.compute(levels, workouts, done("w1a"), 1), "c1").state()).isEqualTo("locked");
+		assertThat(find(ProgressService.compute(levels, workouts, done("w3a"), 3), "c3").canAttempt()).isFalse();
 		Computed c = ProgressService.compute(levels, workouts, done("w1a", "w1b"), 1);
 		assertThat(find(c, "c1").state()).isEqualTo("current");
 		assertThat(find(c, "c1").canAttempt()).isTrue();

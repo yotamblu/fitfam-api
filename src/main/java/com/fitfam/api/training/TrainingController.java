@@ -30,10 +30,18 @@ public class TrainingController {
 
 	private final ProgressService progress;
 	private final StepExpander expander;
+	private final StatsService stats;
 
-	public TrainingController(ProgressService progress, StepExpander expander) {
+	public TrainingController(ProgressService progress, StepExpander expander, StatsService stats) {
 		this.progress = progress;
 		this.expander = expander;
+		this.stats = stats;
+	}
+
+	/** Points, account level and weekly streak, derived from finished workouts. */
+	@GetMapping("/me/stats")
+	public StatsService.StatsDto myStats(@AuthenticationPrincipal AuthenticatedUser user) {
+		return stats.stats(user.id());
 	}
 
 	@GetMapping("/me/plans")
