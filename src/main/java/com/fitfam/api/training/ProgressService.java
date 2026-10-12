@@ -29,8 +29,9 @@ import tools.jackson.databind.ObjectMapper;
  * level challenge. All rules live here:
  * <ul>
  * <li>Workouts of the current level are done strictly in order. Levels above the current one are locked.</li>
- * <li>Completed workouts stay readable. Levels below the current one that were not completed show as skipped, and a
- * skipped workout never has a progress row, so points and streaks cannot count it.</li>
+ * <li>Completed workouts stay readable. In levels below the current one (skipped past), the regular workouts that
+ * were not done are open: they can be played in any order and count like any completed workout. Only the challenge
+ * of such a level stays skipped.</li>
  * <li>Passing the challenge of the current level moves up one level. To start higher, a customer passes the challenge
  * of the level directly below the target (any challenge above the current level, except the top one).</li>
  * </ul>
@@ -42,6 +43,8 @@ public class ProgressService {
 	public static final String CURRENT = "current";
 	public static final String LOCKED = "locked";
 	public static final String SKIPPED = "skipped";
+	/** An unfinished regular workout in a level that was skipped past: playable at any time, in any order. */
+	public static final String OPEN = "open";
 
 	private static final String REASON_CHALLENGE_PASSED = "challenge_passed";
 	private static final String REASON_SKIPPED = "skipped";
@@ -89,7 +92,8 @@ public class ProgressService {
 		Enrollment enrollment = enrollmentForLevel(userId, workout.levelId(), false);
 		RoadmapWorkoutDto entry = findInRoadmap(buildRoadmap(enrollment), workoutId);
 		boolean challengeAttempt = Vocabulary.TYPE_CHALLENGE.equals(workout.type()) && entry.canAttempt();
-		if (!DONE.equals(entry.state()) && !CURRENT.equals(entry.state()) && !challengeAttempt) {
+		if (!DONE.equals(entry.state()) && !CURRENT.equals(entry.state()) && !OPEN.equals(entry.state())
+					&& !challengeAttempt) {
 			throw new ApiException(HttpStatus.FORBIDDEN, "workout_locked");
 		}
 		return jdbc.query("""
@@ -229,7 +233,7 @@ public class ProgressService {
 					state = DONE;
 				}
 				else if (number < current) {
-					state = SKIPPED;
+					state = isChallenge ? SKIPPED : OPEN;
 				}
 				else if (number == current && !currentFound) {
 					state = CURRENT;
@@ -250,7 +254,8 @@ public class ProgressService {
 				}
 			}
 			String levelState = number == current ? CURRENT
-					: number < current ? (allDone ? DONE : SKIPPED) : (allDone && !inLevel.isEmpty() ? DONE : LOCKED);
+					: number < current ? (allDone ? DONE
+								: inLevel.stream().anyMatch(w -> !done.contains(w.id()) && !Vocabulary.TYPE_CHALLENGE.equals(w.type())) ? OPEN : SKIPPED) : (allDone && !inLevel.isEmpty() ? DONE : LOCKED);
 			out.add(new RoadmapLevelDto(level.getValue()[0], number, level.getValue()[1], levelState, items));
 		}
 		return new Computed(out, planCompleted);
@@ -270,7 +275,7 @@ public class ProgressService {
 
 	private void requireCurrent(Enrollment enrollment, UUID workoutId) {
 		RoadmapWorkoutDto entry = findInRoadmap(buildRoadmap(enrollment), workoutId);
-		if (!CURRENT.equals(entry.state())) {
+		if (!CURRENT.equals(entry.state()) && !OPEN.equals(entry.state())) {
 			throw new ApiException(HttpStatus.FORBIDDEN, "workout_locked");
 		}
 	}

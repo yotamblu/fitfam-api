@@ -39,7 +39,7 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
   detail). `YouTubeLinks` accepts only https YouTube hosts and keeps just the 11-char id.
 - `StepExpander` is the one place that unfolds a workout into the flat step list for the guided player. `ProgressService`
   holds the customer rules (strict order within the current level, higher levels locked, completed workouts read-only,
-  skipped levels never get progress rows, challenge pass moves up one level or skips ahead). Keep `compute` free of the
+  unfinished regular workouts in levels skipped past are state `open`: playable in any order and counted like any completed workout, while that level's challenge stays `skipped`; challenge pass moves up one level or skips ahead). Keep `compute` free of the
   database; it is unit tested in `RoadmapRulesTests`.
 - Admin endpoints live in `AdminTrainingController` (`/admin/exercises`, `/admin/training/plans`,
   `/admin/levels/{id}/workouts[/order]`, `/admin/workouts/{id}[/publish|unpublish|archive|restore|duplicate|steps]`);

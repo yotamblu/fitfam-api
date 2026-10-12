@@ -96,10 +96,12 @@ class RoadmapRulesTests {
 	}
 
 	@Test
-	void startingHigherMarksTheLevelsBelowAsSkippedAndNeverAsDone() {
+	void startingHigherOpensTheRegularWorkoutsBelowButNotTheirChallenge() {
 		Computed c = ProgressService.compute(levels, workouts, done("c2"), 3);
-		assertThat(level(c, 1).state()).isEqualTo("skipped");
-		assertThat(find(c, "w1a").state()).isEqualTo("skipped");
+		assertThat(level(c, 1).state()).isEqualTo("open");
+		assertThat(find(c, "w1a").state()).isEqualTo("open");
+		assertThat(find(c, "w1b").state()).isEqualTo("open");
+		assertThat(find(c, "c1").state()).isEqualTo("skipped");
 		assertThat(find(c, "c1").canAttempt()).isFalse();
 		assertThat(find(c, "w3a").state()).isEqualTo("current");
 		assertThat(c.planCompleted()).isFalse();
