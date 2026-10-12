@@ -16,7 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.fitfam.api.auth.AuthenticatedUser;
 import com.fitfam.api.training.TrainingDtos.AttemptRequest;
 import com.fitfam.api.training.TrainingDtos.AttemptResultDto;
+import com.fitfam.api.training.TrainingDtos.CustomerExerciseDto;
 import com.fitfam.api.training.TrainingDtos.CustomerWorkoutDto;
+import com.fitfam.api.training.TrainingDtos.ExerciseDto;
 import com.fitfam.api.training.TrainingDtos.MyPlanDto;
 import com.fitfam.api.training.TrainingDtos.ProgressRequest;
 import com.fitfam.api.training.TrainingDtos.RoadmapDto;
@@ -31,11 +33,22 @@ public class TrainingController {
 	private final ProgressService progress;
 	private final StepExpander expander;
 	private final StatsService stats;
+	private final ExerciseService exercises;
 
-	public TrainingController(ProgressService progress, StepExpander expander, StatsService stats) {
+	public TrainingController(ProgressService progress, StepExpander expander, StatsService stats,
+			ExerciseService exercises) {
 		this.progress = progress;
 		this.expander = expander;
 		this.stats = stats;
+		this.exercises = exercises;
+	}
+
+	/** One exercise explained: description, cues, muscles, equipment and the optional video. Any signed-in customer may read it. */
+	@GetMapping("/exercises/{id}")
+	public CustomerExerciseDto exercise(@PathVariable UUID id) {
+		ExerciseDto e = exercises.get(id);
+		return new CustomerExerciseDto(e.id(), e.nameHe(), e.sport(), e.measure(), e.equipment(), e.muscleGroups(),
+				e.descriptionHe(), e.cuesHe(), e.youtubeId());
 	}
 
 	/** Points, account level and weekly streak, derived from finished workouts. */

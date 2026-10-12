@@ -94,6 +94,8 @@ public class ProgressService {
 		}
 		return jdbc.query("""
 				select w.description_he, w.goal_he, w.details::text as details,
+				       (select x.sport from workouts x where x.level_id = w.level_id and x.status = 'published'
+				        group by x.sport order by count(*) desc, x.sport limit 1) as level_sport,
 				       coalesce((select resume_step from workout_progress
 				                 where enrollment_id = ? and workout_id = w.id and status = 'in_progress'), 0) as resume_step
 				from workouts w where w.id = ?
@@ -101,7 +103,8 @@ public class ProgressService {
 					JsonNode content = mapper.readTree(rs.getString("details"));
 					return new CustomerWorkoutDto(workoutId.toString(), workout.type(), workout.sport(),
 							workout.titleHe(), rs.getString("description_he"), rs.getString("goal_he"),
-							workout.estMinutes(), entry.state(), rs.getInt("resume_step"), content);
+							workout.estMinutes(), entry.state(), rs.getInt("resume_step"), workout.levelNumber(),
+							rs.getString("level_sport"), content);
 				}, enrollment.id(), workoutId).get(0);
 	}
 

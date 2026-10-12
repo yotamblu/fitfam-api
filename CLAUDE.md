@@ -49,6 +49,8 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
   (repeat), distanceM XOR durationSec (one required), zone 1-5, rpe 1-10, restSec, notesHe}`; `enduranceLine` in the validator
   enforces it and `StepExpander.endurance` unfolds it (repeat + rest steps, target named by the built-in ref `builtin:run` /
   `builtin:swim` with measure distance/duration), so clients play it like any other work step.
+- `GET /workouts/{id}` also returns `levelNumber` and `levelSport` (the sport most of that level's published workouts carry), which the customer app uses to paint the venue behind the workout.
+- `GET /exercises/{id}` (customer, any signed-in user) returns one exercise for the exercise page: name, sport, measure, equipment, muscles, description, cues, video id; nothing from the admin bookkeeping.
 - `StatsService` (`GET /me/stats`) derives the game layer from completed workouts, nothing extra stored: 100 points per
   workout, 300 per passed challenge, account level n starts at 150 * n * (n - 1) / 2 points, a Sunday-Saturday (Israel
   time) weekly streak, a default weekly goal of 3, the last 6 weeks. `compute` is a pure function with unit tests.

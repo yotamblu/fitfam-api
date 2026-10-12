@@ -91,10 +91,16 @@ public final class TrainingDtos {
 	}
 
 	public record CustomerWorkoutDto(String id, String type, String sport, String titleHe, String descriptionHe,
-			String goalHe, Integer estMinutes, String state, int resumeStep, JsonNode content) {
+			String goalHe, Integer estMinutes, String state, int resumeStep, int levelNumber, String levelSport,
+			JsonNode content) {
 	}
 
 	public record ProgressRequest(@Min(0) @Max(10000) int resumeStep) {
+	}
+
+	/** What a customer may read about an exercise: everything the coaches wrote, none of the admin bookkeeping. */
+	public record CustomerExerciseDto(String id, String nameHe, String sport, String measure, List<String> equipment,
+			List<String> muscleGroups, String descriptionHe, String cuesHe, String youtubeId) {
 	}
 
 	public record MyPlanDto(String enrollmentId, String planSlug, String planNameHe, int levelNumber,
