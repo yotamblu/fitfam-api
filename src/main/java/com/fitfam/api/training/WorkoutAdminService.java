@@ -111,7 +111,8 @@ public class WorkoutAdminService {
 	public WorkoutDto create(AuthenticatedUser admin, UUID levelId, WorkoutRequest request) {
 		requireLevel(levelId);
 		String type = request.type() == null || request.type().isBlank() ? Vocabulary.TYPE_REGULAR : request.type();
-		if (!Vocabulary.TYPE_REGULAR.equals(type) && !Vocabulary.TYPE_CHALLENGE.equals(type)) {
+		if (!Vocabulary.TYPE_REGULAR.equals(type) && !Vocabulary.TYPE_CHECKPOINT.equals(type)
+				&& !Vocabulary.TYPE_CHALLENGE.equals(type)) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "invalid_type");
 		}
 		if (Vocabulary.TYPE_CHALLENGE.equals(type) && liveChallengeExists(levelId)) {
@@ -132,7 +133,12 @@ public class WorkoutAdminService {
 	@Transactional
 	public WorkoutDto update(AuthenticatedUser admin, UUID id, WorkoutRequest request) {
 		WorkoutDto current = get(id);
-		if (request.type() != null && !request.type().isBlank() && !request.type().equals(current.type())) {
+		String type = request.type() == null || request.type().isBlank() ? current.type() : request.type();
+		// a regular workout and a checkpoint can be switched into each other; the challenge is fixed
+		boolean switchable = Vocabulary.TYPE_REGULAR.equals(type) || Vocabulary.TYPE_CHECKPOINT.equals(type);
+		if (!type.equals(current.type())
+				&& !(switchable && (Vocabulary.TYPE_REGULAR.equals(current.type())
+						|| Vocabulary.TYPE_CHECKPOINT.equals(current.type())))) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "type_immutable");
 		}
 		boolean live = Vocabulary.STATUS_PUBLISHED.equals(current.status());
@@ -141,8 +147,9 @@ public class WorkoutAdminService {
 			requirePublishable(current.type(), fields);
 		}
 		jdbc.update("update workouts set sport = ?, title_he = ?, description_he = ?, goal_he = ?, est_minutes = ?, "
-				+ "details = ?::jsonb, updated_at = now(), updated_by = ? where id = ?", fields.sport, fields.titleHe,
-				fields.descriptionHe, fields.goalHe, fields.estMinutes, fields.contentJson, admin.id(), id);
+				+ "details = ?::jsonb, type = ?, updated_at = now(), updated_by = ? where id = ?", fields.sport,
+				fields.titleHe, fields.descriptionHe, fields.goalHe, fields.estMinutes, fields.contentJson, type,
+				admin.id(), id);
 		audit.record(admin.id(), "workout.updated", "workout", id.toString(), Map.of());
 		return get(id);
 	}

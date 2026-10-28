@@ -147,6 +147,21 @@ class WorkoutContentValidatorTests {
 	}
 
 	@Test
+	void runLinesMayCarryAPersonalPaceAndWalkLinesExist() {
+		String run = "{\"activity\":\"run\",\"distanceM\":400,\"reps\":6,\"pace\":\"interval\",\"restSec\":120}";
+		JsonNode out = validator.validate(json(content("endurance", "", run + ",{\"activity\":\"walk\",\"durationSec\":300}")),
+				true);
+		assertThat(out.at("/sections/0/blocks/0/lines/0/pace").stringValue()).isEqualTo("interval");
+		assertThat(out.at("/sections/0/blocks/0/lines/1/activity").stringValue()).isEqualTo("walk");
+		assertInvalid(content("endurance", "", "{\"activity\":\"run\",\"distanceM\":400,\"pace\":\"sprint\"}"), false,
+				"sections[0].blocks[0].lines[0].pace:invalid");
+		assertInvalid(content("endurance", "", "{\"activity\":\"swim\",\"distanceM\":400,\"pace\":\"easy\"}"), false,
+				"sections[0].blocks[0].lines[0].pace:only_for_run");
+		assertInvalid(content("endurance", "", "{\"activity\":\"walk\",\"durationSec\":60,\"pace\":\"easy\"}"), false,
+				"sections[0].blocks[0].lines[0].pace:only_for_run");
+	}
+
+	@Test
 	void zoneAndRpeStayInTheirScales() {
 		String zone6 = "{\"exerciseId\":\"" + distanceId + "\",\"distanceM\":400,\"zone\":6}";
 		assertInvalid(content("straight", "", zone6), false, "sections[0].blocks[0].lines[0].zone:out_of_range");

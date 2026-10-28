@@ -95,6 +95,9 @@ public final class TrainingDtos {
 			JsonNode content) {
 	}
 
+	public record PaceRequest(@NotNull @Min(PaceService.MIN_FIVE_K_SEC) @Max(PaceService.MAX_FIVE_K_SEC) Integer fiveKSec) {
+	}
+
 	public record ProgressRequest(@Min(0) @Max(10000) int resumeStep) {
 	}
 

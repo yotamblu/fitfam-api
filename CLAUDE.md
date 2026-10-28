@@ -56,6 +56,16 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
   time) weekly streak, a default weekly goal of 3, the last 6 weeks. `compute` is a pure function with unit tests.
 - The challenge of any level below the top can always be attempted (it is also the skip-ahead test: passing it moves up
   one level); the top level's challenge needs everything before it (`canAttempt` in `ProgressService.compute`).
+- Personal running paces (migration V4: `users.five_k_sec` 720-4200 s, `five_k_updated_at`; not on the JPA entity). `PaceService`
+  turns the customer's 5 km time into four paces as speed bands of the 5 km speed (easy 77-83 %, threshold 93-96 %, interval
+  100-105 %, 5 km 100 %; they agree with Daniels VDOT), rounded to 5 s per km; a distance repeat also gets a target time per
+  repeat (nearest second). Only the 5 km time is stored. Endpoints: `GET/PUT/DELETE /me/pace` (`needed` = the customer follows
+  a plan with a published running workout and has no time yet). An endurance line may carry `pace` (`easy|threshold|interval|fivek`,
+  run only) and `activity` may be `walk`; `StepExpander.expand(content, fiveKSec)` fills `target.pace` (kind, Hebrew label and
+  feel, fast/slow sec per km, repeat times; numbers null without a 5 km time). `GET /workouts/{id}/steps` uses the caller's time.
+- Workout `type` is `regular`, `checkpoint` or `challenge` (migration V5). A checkpoint is a regular workout with a star on the
+  roadmap (marks the end of a phase inside a level); every rule treats it like `regular` (only `challenge` is special). Admin
+  update may switch regular <-> checkpoint; the challenge type is fixed.
 - Known quirk: live, a logged-in non-admin on `/admin/**` receives 401, not 403 (error dispatch loses the session); the
   MockMvc test sees 403. Access is denied either way.
 
@@ -68,7 +78,7 @@ logs and `/db-local/`.
 ## Commands
 - Run: `./mvnw -Djava.version=17 spring-boot:run` (PowerShell: `.\mvnw.cmd ...`); check `curl localhost:8081/health`.
   Drop `-Djava.version=17` once JDK 21 is installed (this machine has only JDK 17; the code needs nothing newer).
-- Test: `./mvnw -Djava.version=17 test` (97 tests; mocks only, no real DB or Google needed).
+- Test: `./mvnw -Djava.version=17 test` (103 tests; mocks only, no real DB or Google needed).
 
 ## Deployment (Render free plan)
 - Render builds from GitHub using `Dockerfile` + `render.yaml` (Blueprint: free plan, Frankfurt, `/health`). The image

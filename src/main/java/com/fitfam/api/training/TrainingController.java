@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,6 +21,7 @@ import com.fitfam.api.training.TrainingDtos.CustomerExerciseDto;
 import com.fitfam.api.training.TrainingDtos.CustomerWorkoutDto;
 import com.fitfam.api.training.TrainingDtos.ExerciseDto;
 import com.fitfam.api.training.TrainingDtos.MyPlanDto;
+import com.fitfam.api.training.TrainingDtos.PaceRequest;
 import com.fitfam.api.training.TrainingDtos.ProgressRequest;
 import com.fitfam.api.training.TrainingDtos.RoadmapDto;
 import com.fitfam.api.training.TrainingDtos.StepsDto;
@@ -34,9 +36,11 @@ public class TrainingController {
 	private final StepExpander expander;
 	private final StatsService stats;
 	private final ExerciseService exercises;
+	private final PaceService paces;
 
 	public TrainingController(ProgressService progress, StepExpander expander, StatsService stats,
-			ExerciseService exercises) {
+			ExerciseService exercises, PaceService paces) {
+		this.paces = paces;
 		this.progress = progress;
 		this.expander = expander;
 		this.stats = stats;
@@ -55,6 +59,23 @@ public class TrainingController {
 	@GetMapping("/me/stats")
 	public StatsService.StatsDto myStats(@AuthenticationPrincipal AuthenticatedUser user) {
 		return stats.stats(user.id());
+	}
+
+	/** The customer's 5 km time and the personal paces computed from it. */
+	@GetMapping("/me/pace")
+	public PaceService.PaceStatus myPace(@AuthenticationPrincipal AuthenticatedUser user) {
+		return paces.status(user.id());
+	}
+
+	@PutMapping("/me/pace")
+	public PaceService.PaceStatus setPace(@AuthenticationPrincipal AuthenticatedUser user,
+			@Valid @RequestBody PaceRequest request) {
+		return paces.set(user.id(), request.fiveKSec());
+	}
+
+	@DeleteMapping("/me/pace")
+	public PaceService.PaceStatus clearPace(@AuthenticationPrincipal AuthenticatedUser user) {
+		return paces.clear(user.id());
 	}
 
 	@GetMapping("/me/plans")
@@ -76,7 +97,7 @@ public class TrainingController {
 	@GetMapping("/workouts/{id}/steps")
 	public StepsDto steps(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
 		CustomerWorkoutDto workout = progress.openWorkout(user.id(), id);
-		return new StepsDto(workout.id(), workout.resumeStep(), expander.expand(workout.content()));
+		return new StepsDto(workout.id(), workout.resumeStep(), expander.expand(workout.content(), paces.fiveKSec(user.id())));
 	}
 
 	@PutMapping("/workouts/{id}/progress")

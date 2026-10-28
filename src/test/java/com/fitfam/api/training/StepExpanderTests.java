@@ -128,4 +128,24 @@ class StepExpanderTests {
 		assertThat(expand("{\"sections\":[]}")).isEmpty();
 	}
 
+
+	@Test
+	void runLinesGetPersonalPacesFromTheFiveKTime() {
+		String json = block("endurance", "", "{\"activity\":\"run\",\"distanceM\":400,\"reps\":2,\"pace\":\"interval\"}",
+				"{\"activity\":\"walk\",\"durationSec\":120}");
+		List<Step> withTime = expander.expand(mapper.readTree(json), known, 1200);
+		PaceService.Pace pace = withTime.get(0).target().pace();
+		assertThat(pace.kind()).isEqualTo("interval");
+		assertThat(pace.fastSecPerKm()).isEqualTo(230); // 240 s/km / 1.05 = 228.6 -> 230
+		assertThat(pace.slowSecPerKm()).isEqualTo(240);
+		assertThat(pace.repFastSec()).isEqualTo(91); // 228.6 s/km * 0.4 km
+		assertThat(pace.repSlowSec()).isEqualTo(96);
+		assertThat(withTime.get(2).target().exercise().id()).isEqualTo("builtin:walk");
+		assertThat(withTime.get(2).target().pace()).isNull();
+
+		PaceService.Pace without = expander.expand(mapper.readTree(json), known, null).get(0).target().pace();
+		assertThat(without.kind()).isEqualTo("interval");
+		assertThat(without.fastSecPerKm()).isNull();
+		assertThat(without.feelHe()).isNotBlank();
+	}
 }

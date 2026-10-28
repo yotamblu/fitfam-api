@@ -37,7 +37,8 @@ public class StepExpander {
 
 	/** One exercise with its targets, as the coach entered them. */
 	public record Target(ExerciseRef exercise, Integer reps, Integer repsMax, Integer durationSec, Integer distanceM,
-			Integer calories, Integer capSec, Integer zone, Integer rpe, String loadHe, String notesHe) {
+			Integer calories, Integer capSec, Integer zone, Integer rpe, String loadHe, String notesHe,
+			PaceService.Pace pace) {
 	}
 
 	public record Step(int index, String type, String sectionTitle, String blockStyle, String blockNotes,
@@ -56,8 +57,13 @@ public class StepExpander {
 		this.exercises = exercises;
 	}
 
-	/** Looks up the exercises used by {@code content} and expands it. */
+	/** Looks up the exercises used by {@code content} and expands it (paces carry names only, no numbers). */
 	public List<Step> expand(JsonNode content) {
+		return expand(content, (Integer) null);
+	}
+
+	/** Same, with the customer's 5 km time (seconds, or null) so that running lines get their personal paces. */
+	public List<Step> expand(JsonNode content, Integer fiveKSec) {
 		Set<UUID> ids = new LinkedHashSet<>();
 		for (JsonNode section : content.path("sections")) {
 			for (JsonNode block : section.path("blocks")) {
@@ -68,10 +74,14 @@ public class StepExpander {
 				}
 			}
 		}
-		return expand(content, exercises.lookup(ids));
+		return expand(content, exercises.lookup(ids), fiveKSec);
 	}
 
 	public List<Step> expand(JsonNode content, Map<UUID, ExerciseInfo> known) {
+		return expand(content, known, null);
+	}
+
+	public List<Step> expand(JsonNode content, Map<UUID, ExerciseInfo> known, Integer fiveKSec) {
 		List<Step> steps = new ArrayList<>();
 		for (JsonNode section : content.path("sections")) {
 			String sectionTitle = textOrNull(section, "title");
@@ -79,7 +89,7 @@ public class StepExpander {
 				String style = block.path("style").stringValue();
 				String notes = textOrNull(block, "notes");
 				switch (style) {
-					case "endurance" -> endurance(block, sectionTitle, notes, steps);
+					case "endurance" -> endurance(block, sectionTitle, notes, fiveKSec, steps);
 						case "circuit" -> circuit(block, sectionTitle, notes, known, steps);
 					case "amrap", "emom", "for_time" -> timed(block, style, sectionTitle, notes, known, steps);
 					default -> straight(block, sectionTitle, notes, known, steps);
@@ -114,9 +124,9 @@ public class StepExpander {
 	}
 
 	/** Plain running / swimming segments: each line repeats {@code reps} times, its rest follows every repeat. */
-	private void endurance(JsonNode block, String sectionTitle, String notes, List<Step> out) {
+	private void endurance(JsonNode block, String sectionTitle, String notes, Integer fiveKSec, List<Step> out) {
 		for (JsonNode line : block.path("lines")) {
-			Target target = enduranceTarget(line);
+			Target target = enduranceTarget(line, fiveKSec);
 			int count = line.path("reps").intValue(1);
 			int rest = line.path("restSec").intValue(0);
 			for (int i = 1; i <= count; i++) {
@@ -129,13 +139,19 @@ public class StepExpander {
 		}
 	}
 
-	private static Target enduranceTarget(JsonNode line) {
-		boolean swim = "swim".equals(line.path("activity").stringValue());
+	private static Target enduranceTarget(JsonNode line, Integer fiveKSec) {
+		String activity = line.path("activity").stringValue();
 		boolean byDistance = line.has("distanceM");
-		ExerciseRef ref = new ExerciseRef(swim ? "builtin:swim" : "builtin:run", swim ? "שחייה" : "ריצה",
-				byDistance ? "distance" : "duration", null, null, null);
+		ExerciseRef ref = switch (activity) {
+			case "swim" -> new ExerciseRef("builtin:swim", "שחייה", byDistance ? "distance" : "duration", null, null, null);
+			case "walk" -> new ExerciseRef("builtin:walk", "הליכה", byDistance ? "distance" : "duration", null, null, null);
+			default -> new ExerciseRef("builtin:run", "ריצה", byDistance ? "distance" : "duration", null, null, null);
+		};
+		String paceKind = textOrNull(line, "pace");
+		PaceService.Pace pace = paceKind == null ? null
+				: PaceService.pace(paceKind, fiveKSec, intOrNull(line, "distanceM"));
 		return new Target(ref, null, null, intOrNull(line, "durationSec"), intOrNull(line, "distanceM"), null, null,
-				intOrNull(line, "zone"), intOrNull(line, "rpe"), null, textOrNull(line, "notesHe"));
+				intOrNull(line, "zone"), intOrNull(line, "rpe"), null, textOrNull(line, "notesHe"), pace);
 	}
 
 	private void circuit(JsonNode block, String sectionTitle, String notes, Map<UUID, ExerciseInfo> known,
@@ -199,7 +215,7 @@ public class StepExpander {
 				repsAreTarget ? intOrNull(line, "repsMax") : null, intOrNull(line, "durationSec"),
 				intOrNull(line, "distanceM"), intOrNull(line, "calories"), intOrNull(line, "capSec"),
 				intOrNull(line, "zone"), intOrNull(line, "rpe"), textOrNull(line, "loadHe"),
-				textOrNull(line, "notesHe"));
+				textOrNull(line, "notesHe"), null);
 	}
 
 	private static Integer intOrNull(JsonNode node, String key) {

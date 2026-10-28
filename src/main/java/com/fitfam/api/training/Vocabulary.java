@@ -10,6 +10,7 @@ public final class Vocabulary {
 			"max_effort");
 
 	public static final String TYPE_REGULAR = "regular";
+	public static final String TYPE_CHECKPOINT = "checkpoint";
 	public static final String TYPE_CHALLENGE = "challenge";
 
 	public static final String STATUS_DRAFT = "draft";

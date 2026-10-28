@@ -35,9 +35,9 @@ public class WorkoutContentValidator {
 
 	static final Set<String> STYLES = Set.of("straight", "circuit", "amrap", "emom", "for_time", "endurance");
 
-	static final Set<String> ACTIVITIES = Set.of("run", "swim");
+	static final Set<String> ACTIVITIES = Set.of("run", "swim", "walk");
 	private static final Set<String> ENDURANCE_LINE = Set.of("id", "activity", "notesHe", "restSec", "reps", "distanceM",
-			"durationSec", "zone", "rpe");
+			"durationSec", "zone", "rpe", "pace");
 
 	private static final Set<String> LINE_BASE = Set.of("id", "exerciseId", "notesHe", "restSec");
 	private static final Map<String, Set<String>> LINE_EXTRA = Map.of(
@@ -329,6 +329,17 @@ public class WorkoutContentValidator {
 		}
 		copyInt(in, out, "zone", path, 1, 5, false);
 		copyInt(in, out, "rpe", path, 1, 10, false);
+		JsonNode pace = in.get("pace");
+		if (pace != null && !pace.isNull()) {
+			// a personal pace (easy / threshold / interval / 5 km) only makes sense for running
+			if (!"run".equals(activity)) {
+				throw invalid(path + ".pace", "only_for_run");
+			}
+			if (!pace.isString() || !PaceService.isKind(pace.stringValue())) {
+				throw invalid(path + ".pace", "invalid");
+			}
+			out.put("pace", pace.stringValue());
+		}
 	}
 
 	private void collectExerciseIds(JsonNode sections, Set<UUID> into) {
