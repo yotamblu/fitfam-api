@@ -21,6 +21,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.fitfam.api.auth.SessionAuthFilter;
+import com.fitfam.api.auth.SessionCookies;
 import com.fitfam.api.auth.SessionTokenService;
 import com.fitfam.api.domain.UserRepository;
 
@@ -29,8 +30,8 @@ import com.fitfam.api.domain.UserRepository;
 public class SecurityConfig {
 
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http, SessionTokenService tokens, UserRepository users)
-			throws Exception {
+	SecurityFilterChain securityFilterChain(HttpSecurity http, SessionTokenService tokens, UserRepository users,
+			SessionCookies cookies) throws Exception {
 		http
 				// Stateless cookie auth. CSRF protection comes from SameSite=Lax cookies, the CORS allowlist, and
 				// state-changing endpoints accepting only JSON bodies.
@@ -54,7 +55,7 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.POST, "/auth/google", "/auth/logout").permitAll()
 						.requestMatchers("/admin/**").hasRole("ADMIN")
 						.anyRequest().authenticated())
-				.addFilterBefore(new SessionAuthFilter(tokens, users), UsernamePasswordAuthenticationFilter.class);
+				.addFilterBefore(new SessionAuthFilter(tokens, users, cookies), UsernamePasswordAuthenticationFilter.class);
 		return http.build();
 	}
 

@@ -18,7 +18,7 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
 - `POST /auth/google` verifies the Google ID token (`google-api-client`: signature, `aud`, `iss`, `exp`) and requires
   `email_verified`. Google only proves the email. It is accepted only if that email already exists in `users`
   (otherwise 403 `not_invited`, nothing created). No `google_sub`, no Google tokens stored.
-- Session: own HS256 JWT (user id only) in an HttpOnly `ff_session` cookie, SameSite=Lax, 7 days. `SessionAuthFilter`
+- Session: own HS256 JWT (user id only) in an HttpOnly `ff_session` cookie, SameSite=Lax, 30 days for customers (sliding: `SessionAuthFilter` re-issues the cookie when it is over a day old; never for admins or logout), 12 hours for admins. `SessionAuthFilter`
   reloads the user from the DB on every request. Never put tokens in localStorage or responses.
 - `/admin/**` requires `role = 'admin'`. CSRF protection relies on SameSite=Lax + the CORS allowlist + JSON-only
   bodies; keep state-changing endpoints POST/PUT/DELETE with JSON.

@@ -246,7 +246,7 @@ nothing.
 - **Access control:** everything except the health check, login and logout needs a valid session; `/admin/**` needs the
   admin role. The user and role are re-read from the database on every request, so removing or demoting someone applies
   at once. Forged, unsigned, tampered, wrongly signed and expired tokens are rejected (unit tests plus live checks).
-- **Sessions:** a signed token in an `HttpOnly`, `SameSite=Lax` cookie. Customers get 7 days, admins 12 hours
+- **Sessions:** a signed token in an `HttpOnly`, `SameSite=Lax` cookie. Customers get 30 days that renew while they keep using the app, admins 12 hours with no renewal
   (`app.session.admin-hours`). Sessions are stateless, so there is no server-side "log out everywhere".
 - **Browser-facing headers** on every response: CSP `default-src 'none'; frame-ancestors 'none'`, `X-Frame-Options: DENY`,
   `nosniff`, `Referrer-Policy: no-referrer`, HSTS, `no-store`. Only the health check is exposed by Actuator, and errors

@@ -42,13 +42,32 @@ public class SessionTokenService {
 	}
 
 	public String issue(UUID userId, Duration lifetime) {
-		Instant now = Instant.now();
+		return issueAt(userId, Instant.now(), lifetime);
+	}
+
+	/** Same as {@link #issue} with an explicit issue time (tests use it to age a token). */
+	String issueAt(UUID userId, Instant now, Duration lifetime) {
 		return Jwts.builder()
 				.subject(userId.toString())
 				.issuedAt(Date.from(now))
 				.expiration(Date.from(now.plus(lifetime)))
 				.signWith(key, Jwts.SIG.HS256)
 				.compact();
+	}
+
+	/** A valid token's user and the moment it was issued. */
+	public record Parsed(UUID userId, Instant issuedAt) {
+	}
+
+	/** @return the user and issue time, or empty if the token is malformed, tampered with or expired */
+	public Optional<Parsed> parseWithIssuedAt(String token) {
+		try {
+			var claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+			return Optional.of(new Parsed(UUID.fromString(claims.getSubject()), claims.getIssuedAt().toInstant()));
+		}
+		catch (JwtException | IllegalArgumentException | NullPointerException e) {
+			return Optional.empty();
+		}
 	}
 
 	/** @return the user id, or empty if the token is malformed, tampered with or expired */
