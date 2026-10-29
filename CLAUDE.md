@@ -84,7 +84,7 @@ logs and `/db-local/`.
 ## Commands
 - Run: `./mvnw -Djava.version=17 spring-boot:run` (PowerShell: `.\mvnw.cmd ...`); check `curl localhost:8081/health`.
   Drop `-Djava.version=17` once JDK 21 is installed (this machine has only JDK 17; the code needs nothing newer).
-- Test: `./mvnw -Djava.version=17 test` (112 tests; mocks only, no real DB or Google needed).
+- Test: `./mvnw -Djava.version=17 test` (111 tests; mocks only, no real DB or Google needed).
 
 ## Deployment (Render free plan)
 - Render builds from GitHub using `Dockerfile` + `render.yaml` (Blueprint: free plan, Frankfurt, `/health`). The image
@@ -94,8 +94,9 @@ logs and `/db-local/`.
 - `CORS_ALLOWED_ORIGINS` must be https-only in production or the app refuses to start (intended).
 - Free plan facts: sleeps after 15 min idle (about a minute to wake), 512 MB RAM, small CPU share, 750 free hours per
   month per workspace. JVM flags for that are in `render.yaml` (`JAVA_TOOL_OPTIONS`). Keep memory under ~400 MB.
-- The Docker image itself has NOT been built locally (no Docker on the dev machine); the jar, the production settings,
-  the port and the memory were simulated locally instead. The first Render build is the real test.
+- The Docker image is built by Render itself (there is no Docker on the dev machine); the service has been live since
+  2026-10-08. Every push to `main` redeploys it, and Flyway runs any new `V*.sql` migration on startup (a migration
+  that was already applied by hand must not be changed: Flyway checks its checksum).
 
 ## Windows gotchas
 - `PKIX path building failed` while Maven downloads: run Maven with
