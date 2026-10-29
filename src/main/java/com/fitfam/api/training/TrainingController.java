@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fitfam.api.auth.AuthenticatedUser;
+import com.fitfam.api.legal.ConsentService;
 import com.fitfam.api.training.TrainingDtos.AttemptRequest;
 import com.fitfam.api.training.TrainingDtos.AttemptResultDto;
 import com.fitfam.api.training.TrainingDtos.CustomerExerciseDto;
@@ -37,10 +38,12 @@ public class TrainingController {
 	private final StatsService stats;
 	private final ExerciseService exercises;
 	private final PaceService paces;
+	private final ConsentService consents;
 
 	public TrainingController(ProgressService progress, StepExpander expander, StatsService stats,
-			ExerciseService exercises, PaceService paces) {
+			ExerciseService exercises, PaceService paces, ConsentService consents) {
 		this.paces = paces;
+		this.consents = consents;
 		this.progress = progress;
 		this.expander = expander;
 		this.stats = stats;
@@ -96,6 +99,7 @@ public class TrainingController {
 	/** The flat step list for the optional guided mode. */
 	@GetMapping("/workouts/{id}/steps")
 	public StepsDto steps(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
+		consents.requireCurrent(user);
 		CustomerWorkoutDto workout = progress.openWorkout(user.id(), id);
 		return new StepsDto(workout.id(), workout.resumeStep(), expander.expand(workout.content(), paces.fiveKSec(user.id())));
 	}
@@ -104,17 +108,20 @@ public class TrainingController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void saveProgress(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
 			@Valid @RequestBody ProgressRequest request) {
+		consents.requireCurrent(user);
 		progress.saveProgress(user.id(), id, request.resumeStep());
 	}
 
 	@PostMapping("/workouts/{id}/complete")
 	public RoadmapDto complete(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
+		consents.requireCurrent(user);
 		return progress.complete(user.id(), id);
 	}
 
 	@PostMapping("/challenges/{workoutId}/attempt")
 	public AttemptResultDto attempt(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID workoutId,
 			@Valid @RequestBody AttemptRequest request) {
+		consents.requireCurrent(user);
 		return progress.attemptChallenge(user.id(), workoutId, request.passed());
 	}
 

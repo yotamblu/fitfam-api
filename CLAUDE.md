@@ -65,6 +65,13 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
 - Workout `type` is `regular`, `checkpoint` or `challenge` (migration V5). A checkpoint is a regular workout with a star on the
   roadmap (marks the end of a phase inside a level); every rule treats it like `regular` (only `challenge` is special). Admin
   update may switch regular <-> checkpoint; the challenge type is fixed.
+- Legal side (package `com.fitfam.api.legal`, migration V7 `user_consents`): `ConsentService` stores append-only acceptances
+  (`terms`: terms + privacy versions; `health_declaration`: yes/no answers, medical clearance, confirmations, typed name, 2-year
+  `expires_at`). `LegalVersions` holds the current versions and the question ids; the web app holds the texts and must be bumped
+  together. Endpoints: `GET /me/consents`, `POST /me/consents/terms|health`, `GET /me/export` (the caller's data),
+  `DELETE /me` (deletes the customer, cascades, also removes their waitlist signup, clears the cookie; admins cannot self-delete).
+  `ConsentService.requireCurrent` (403 `consent_required`) guards steps, progress, complete and challenge attempts; admins are exempt.
+  Health answers are special-category data: never log them, never return them to other users, never use them for anything else.
 - Known quirk: live, a logged-in non-admin on `/admin/**` receives 401, not 403 (error dispatch loses the session); the
   MockMvc test sees 403. Access is denied either way.
 
@@ -77,7 +84,7 @@ logs and `/db-local/`.
 ## Commands
 - Run: `./mvnw -Djava.version=17 spring-boot:run` (PowerShell: `.\mvnw.cmd ...`); check `curl localhost:8081/health`.
   Drop `-Djava.version=17` once JDK 21 is installed (this machine has only JDK 17; the code needs nothing newer).
-- Test: `./mvnw -Djava.version=17 test` (103 tests; mocks only, no real DB or Google needed).
+- Test: `./mvnw -Djava.version=17 test` (112 tests; mocks only, no real DB or Google needed).
 
 ## Deployment (Render free plan)
 - Render builds from GitHub using `Dockerfile` + `render.yaml` (Blueprint: free plan, Frankfurt, `/health`). The image
