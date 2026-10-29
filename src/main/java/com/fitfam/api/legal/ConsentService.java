@@ -29,7 +29,7 @@ public class ConsentService {
 	public record Health(String version, String declaredAt, String expiresAt, boolean current) {
 	}
 
-	/** {@code required} is false for admins (they test the app); {@code ok} = nothing is missing. */
+	/** {@code required} is true for everyone, admins included (so the team goes through exactly what customers do); {@code ok} = nothing is missing. */
 	public record Status(boolean required, boolean ok, String termsVersion, String privacyVersion, String healthVersion,
 			Terms terms, Health health) {
 	}
@@ -70,12 +70,12 @@ public class ConsentService {
 				""", (rs, i) -> new Health(rs.getString("version"), rs.getString("at"), rs.getString("until"),
 				LegalVersions.HEALTH.equals(rs.getString("version")) && rs.getBoolean("valid")),
 				user.id()).stream().findFirst().orElse(null);
-		boolean required = !user.isAdmin();
-		boolean ok = !required || (terms != null && terms.current() && health != null && health.current());
+		boolean required = true;
+		boolean ok = terms != null && terms.current() && health != null && health.current();
 		return new Status(required, ok, LegalVersions.TERMS, LegalVersions.PRIVACY, LegalVersions.HEALTH, terms, health);
 	}
 
-	/** Customers must have a current acceptance and declaration before they train; admins are exempt. */
+	/** Everyone, admins too, must have a current acceptance and declaration before they train. */
 	public void requireCurrent(AuthenticatedUser user) {
 		if (!status(user).ok()) {
 			throw new ApiException(HttpStatus.FORBIDDEN, "consent_required");
