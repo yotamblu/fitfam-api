@@ -72,11 +72,12 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
   `DELETE /me` (deletes the customer, cascades, also removes their waitlist signup, clears the cookie; admins cannot self-delete).
   `ConsentService.requireCurrent` (403 `consent_required`) guards steps, progress, complete and challenge attempts; admins are NOT exempt (the team goes through the same steps, to test them).
   Health answers are special-category data: never log them, never return them to other users, never use them for anything else.
+- Fitbot, the AI assistant (package `com.fitfam.api.fitbot`, migration V8: `chat_threads`, `chat_messages`, `fitbot_knowledge`, and `user_consents.kind = 'ai_chat'`). `ChatModel` is the only thing that knows the provider; `GeminiChatModel` calls Google Gemini `generateContent` over HTTPS (key in the `x-goog-api-key` header, never logged; prompts and answers are never logged; non-streaming; echoes the model's own tool-call turns back untouched because they can carry provider bookkeeping). `FitbotService` builds each answer from fixed rules (`FitbotPrompts`, generic, no business text), the coaches' text sections (`KnowledgeService`, table `fitbot_knowledge`, edited in the admin app through `/admin/fitbot/knowledge`; their total is capped at 24,000 characters), a short customer context, and the last 20 messages. `FitbotTools` gives the model read-only tools (`get_my_progress`, `get_next_workout`, `get_workout`, `get_roadmap`, `get_exercise`, `get_paces`) that run as the signed-in customer (the user id comes from the session; workouts open through `ProgressService`, so locked ones stay locked); at most 4 model rounds per message. Markers in the model's text: `[[NUTRITION]]` becomes the fixed disclaimer, `[[open_workout:<id>]]` becomes a button only if a tool returned that workout in the same turn. No database transaction is held while the model works (small pool). A failed answer deletes the question again (clean history, quota not used). Endpoints: `GET /me/chats` (overview: `available`, `aiConsent`, daily limit and use, chats), `POST /me/chats/consent`, `POST /me/chats`, `GET /me/chats/{id}`, `POST /me/chats/{id}/messages`, `POST /me/chats/{id}/title` (a second small model call after the first answer; falls back to the first words), `PUT /me/chats/{id}` (rename), `DELETE /me/chats/{id}`. Sending needs current legal consents, the `ai_chat` consent (403 `ai_consent_required`) and stays under 30 messages per day (Israel day, 429 `daily_limit`). `FitbotRetentionJob` deletes conversations untouched for 100 days. Chats are in `/me/export` and cascade on account deletion. Switches: `FITBOT_ENABLED`, `FITBOT_ADMINS_ONLY` (default true: only admins may use it while the provider is on a free tier, because free-tier prompts may be used by the provider), `FITBOT_DAILY_MESSAGES`, `FITBOT_RETENTION_DAYS`. Errors the client explains: `fitbot_unavailable` (503), `fitbot_busy` (429, provider rate limit), `fitbot_failed` / `fitbot_empty` (502).
 - Known quirk: live, a logged-in non-admin on `/admin/**` receives 401, not 403 (error dispatch loses the session); the
   MockMvc test sees 403. Access is denied either way.
 
 ## Config (env vars; locally from the gitignored `.env`)
-`DB_URL`, `DB_USER`, `DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `JWT_SECRET` (>= 32 bytes), `COOKIE_SECURE` (`false` for local
+`DB_URL`, `DB_USER`, `DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `JWT_SECRET` (>= 32 bytes), `GEMINI_API_KEY` + `GEMINI_MODEL` (Fitbot; without them Fitbot reports itself unavailable and the app hides it), optional `FITBOT_*` (see above), `COOKIE_SECURE` (`false` for local
 http), `CORS_ALLOWED_ORIGINS` (default `http://localhost:3000,http://localhost:3001`), `PORT` (default 8081).
 `application.properties` holds only `${ENV}` references. `.gitignore` covers `.env*`, key files, `application-local*`,
 logs and `/db-local/`.
@@ -84,7 +85,7 @@ logs and `/db-local/`.
 ## Commands
 - Run: `./mvnw -Djava.version=17 spring-boot:run` (PowerShell: `.\mvnw.cmd ...`); check `curl localhost:8081/health`.
   Drop `-Djava.version=17` once JDK 21 is installed (this machine has only JDK 17; the code needs nothing newer).
-- Test: `./mvnw -Djava.version=17 test` (111 tests; mocks only, no real DB or Google needed).
+- Test: `./mvnw -Djava.version=17 test` (118 tests; mocks only, no real DB, Google or AI provider needed).
 
 ## Deployment (Render free plan)
 - Render builds from GitHub using `Dockerfile` + `render.yaml` (Blueprint: free plan, Frankfurt, `/health`). The image

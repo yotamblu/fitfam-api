@@ -8,7 +8,7 @@ package com.fitfam.api.legal;
 public final class LegalVersions {
 
 	public static final String TERMS = "2026-10-29.2";
-	public static final String PRIVACY = "2026-10-29.2";
+	public static final String PRIVACY = "2026-10-30";
 	public static final String HEALTH = "2026-10-30";
 
 	private LegalVersions() {
