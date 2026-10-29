@@ -34,7 +34,7 @@ public class ConsentService {
 			Terms terms, Health health) {
 	}
 
-	public record TermsRequest(String termsVersion, String privacyVersion, boolean adult) {
+	public record TermsRequest(String termsVersion, String privacyVersion, boolean ageConfirmed) {
 	}
 
 	/**
@@ -42,7 +42,7 @@ public class ConsentService {
 	 * and a doctor cleared them (the list itself is part of the versioned text in the web app).
 	 */
 	public record HealthRequest(String version, boolean conditionsDeclaration, boolean riskAcknowledged,
-			boolean accuracyConfirmed, boolean dataConsent, boolean adult, String fullName) {
+			boolean accuracyConfirmed, boolean dataConsent, boolean ageConfirmed, String fullName) {
 	}
 
 	private final JdbcTemplate jdbc;
@@ -89,13 +89,13 @@ public class ConsentService {
 		if (!LegalVersions.TERMS.equals(request.termsVersion()) || !LegalVersions.PRIVACY.equals(request.privacyVersion())) {
 			throw new ApiException(HttpStatus.CONFLICT, "version_outdated");
 		}
-		if (!request.adult()) {
-			throw new ApiException(HttpStatus.BAD_REQUEST, "adult_required");
+		if (!request.ageConfirmed()) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "age_required");
 		}
 		Map<String, Object> details = new LinkedHashMap<>();
 		details.put("termsVersion", request.termsVersion());
 		details.put("privacyVersion", request.privacyVersion());
-		details.put("adult", true);
+		details.put("ageConfirmed", true);
 		jdbc.update("insert into user_consents (user_id, kind, version, details) values (?, 'terms', ?, ?::jsonb)",
 				user.id(), request.termsVersion(), mapper.writeValueAsString(details));
 		return status(user);
@@ -110,7 +110,7 @@ public class ConsentService {
 		details.put("riskAcknowledged", true);
 		details.put("accuracyConfirmed", true);
 		details.put("dataConsent", true);
-		details.put("adult", true);
+		details.put("ageConfirmed", true);
 		details.put("fullName", request.fullName().trim());
 		jdbc.update("""
 				insert into user_consents (user_id, kind, version, expires_at, details)
@@ -124,7 +124,7 @@ public class ConsentService {
 		if (!LegalVersions.HEALTH.equals(request.version())) {
 			throw new ApiException(HttpStatus.CONFLICT, "version_outdated");
 		}
-		if (!request.conditionsDeclaration() || !request.adult() || !request.riskAcknowledged()
+		if (!request.conditionsDeclaration() || !request.ageConfirmed() || !request.riskAcknowledged()
 				|| !request.accuracyConfirmed() || !request.dataConsent()) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "confirmations_required");
 		}

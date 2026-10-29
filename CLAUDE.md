@@ -68,7 +68,7 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
 - Legal side (package `com.fitfam.api.legal`, migration V7 `user_consents`): `ConsentService` stores append-only acceptances
   (`terms`: terms + privacy versions; `health_declaration`: one versioned declaration (no per-condition answers are stored, on purpose), confirmations, typed name, 2-year
   `expires_at`). `LegalVersions` holds the current versions; the web app holds the texts and must be bumped
-  together. Endpoints: `GET /me/consents`, `POST /me/consents/terms|health`, `GET /me/export` (the caller's data),
+  together. Both requests carry `ageConfirmed` (a self-declared minimum age; nothing is verified) and the versions must match `LegalVersions` (409 `version_outdated`). Endpoints: `GET /me/consents`, `POST /me/consents/terms|health`, `GET /me/export` (the caller's data),
   `DELETE /me` (deletes the customer, cascades, also removes their waitlist signup, clears the cookie; admins cannot self-delete).
   `ConsentService.requireCurrent` (403 `consent_required`) guards steps, progress, complete and challenge attempts; admins are NOT exempt (the team goes through the same steps, to test them).
   Health answers are special-category data: never log them, never return them to other users, never use them for anything else.
