@@ -51,6 +51,28 @@ class FitbotServiceTests {
 	}
 
 	@Test
+	void afterWorkoutPromptCarriesTheWorkoutTheRulesAndTheResult() {
+		String extra = FitbotPrompts.afterWorkout("כותרת: אימון בדיקה\n- תרגיל א 10 חזרות", "האימון סומן כהושלם.");
+		String prompt = FitbotPrompts.system(List.of(), "תוכנית: בדיקה", extra);
+		assertThat(prompt).contains("אחרי אימון").contains("אימון בדיקה").contains("האימון סומן כהושלם.");
+		assertThat(prompt.indexOf("אחרי אימון")).isLessThan(prompt.indexOf("תוכנית: בדיקה"));
+		assertThat(FitbotPrompts.system(List.of(), "x")).doesNotContain("אחרי אימון");
+	}
+
+	@Test
+	void aFitbotOpenedConversationKeepsItsOpeningAnswerBehindTheAutomaticOpener() {
+		List<ChatModel.Turn> turns = List.of(new ChatModel.Turn("assistant", "פתיחה"), new ChatModel.Turn("user", "היה קשה"));
+		List<ChatModel.Turn> after = FitbotService.startWithCustomer(turns, true);
+		assertThat(after).hasSize(3);
+		assertThat(after.get(0).role()).isEqualTo("user");
+		assertThat(after.get(0).text()).isEqualTo(FitbotPrompts.AFTER_WORKOUT_OPENER);
+		assertThat(after.get(1).text()).isEqualTo("פתיחה");
+		// an ordinary conversation still starts at the customer's first turn
+		assertThat(FitbotService.startWithCustomer(turns, false)).containsExactly(new ChatModel.Turn("user", "היה קשה"));
+		assertThat(FitbotService.startWithCustomer(List.of(new ChatModel.Turn("user", "שלום")), true)).hasSize(1);
+	}
+
+	@Test
 	void slugsAreLowercaseWordsAndDashes() {
 		assertThat(KnowledgeService.checkedSlug(" Voice-1 ")).isEqualTo("voice-1");
 		assertThatThrownBy(() -> KnowledgeService.checkedSlug("bad slug!")).isInstanceOf(ApiException.class);

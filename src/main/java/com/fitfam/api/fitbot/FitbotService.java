@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -202,8 +203,19 @@ public class FitbotService {
 
 		ChatModel.Reply reply;
 		FitbotTools.Session session = tools.session(user.id());
+		UUID workoutId = threadWorkout(chatId);
 		try {
-			reply = model.chat(systemPrompt(user, session), history(chatId), tools.specs(), session);
+			String extra = null;
+			if (workoutId != null) {
+				try {
+					extra = workoutContext(user.id(), workoutId, session);
+				}
+				catch (ApiException e) {
+					// the workout is gone or no longer readable: the conversation simply continues without it
+					log.warn("Fitbot: could not load the workout of a conversation ({})", e.getCode());
+				}
+			}
+			reply = model.chat(systemPrompt(user, session, extra), history(chatId, workoutId != null), tools.specs(), session);
 		}
 		catch (RuntimeException e) {
 			// nothing was answered: take the question back so the history stays clean and the daily quota is not used
@@ -222,6 +234,48 @@ public class FitbotService {
 				reply.toolsUsed().size());
 
 		return new SendResult(message(userMessageId), message(replyId), used + 1, dailyLimit);
+	}
+
+	/**
+	 * Opens (or returns) the conversation about a finished workout. Fitbot writes the first message from the workout and the
+	 * customer's data. One such conversation exists per customer and workout, so asking again just returns it; it is a normal
+	 * conversation in the list. Nothing is saved if the model fails.
+	 */
+	public ChatDto afterWorkout(AuthenticatedUser user, UUID workoutId) {
+		requireAvailable(user);
+		consents.requireCurrent(user);
+		if (!hasAiConsent(user.id())) {
+			throw new ApiException(HttpStatus.FORBIDDEN, "ai_consent_required");
+		}
+		UUID existing = threadForWorkout(user.id(), workoutId);
+		if (existing != null) {
+			return get(user, existing);
+		}
+		FitbotTools.Session session = tools.session(user.id());
+		String extra = workoutContext(user.id(), workoutId, session);
+		ChatModel.Reply reply = model.chat(systemPrompt(user, session, extra),
+				List.of(new ChatModel.Turn("user", FitbotPrompts.AFTER_WORKOUT_OPENER)), tools.specs(), session);
+		Answer answer = finish(reply.text(), session.workouts());
+
+		String workoutTitle = jdbc.queryForObject("select coalesce(title_he, 'אימון') from workouts where id = ?", String.class,
+				workoutId);
+		UUID chatId;
+		try {
+			chatId = jdbc.queryForObject(
+					"insert into chat_threads (user_id, title, title_source, workout_id) values (?, ?, 'auto', ?) returning id",
+					UUID.class, user.id(), "אחרי: " + clip(workoutTitle, 50), workoutId);
+		}
+		catch (DuplicateKeyException e) {
+			// a second tap won the race: show the conversation that exists
+			return get(user, threadForWorkout(user.id(), workoutId));
+		}
+		jdbc.update("""
+				insert into chat_messages (thread_id, user_id, role, content, actions, model, input_tokens, output_tokens)
+				values (?, ?, 'assistant', ?, ?::jsonb, ?, ?, ?)
+				""", chatId, user.id(), answer.text(), mapper.writeValueAsString(answer.actions()), model.modelName(),
+				reply.inputTokens(), reply.outputTokens());
+		log.info("Fitbot opened a conversation after a workout: tokens in={} out={}", reply.inputTokens(), reply.outputTokens());
+		return get(user, chatId);
 	}
 
 	/**
@@ -264,17 +318,53 @@ public class FitbotService {
 
 	// ---- helpers ----
 
-	private String systemPrompt(AuthenticatedUser user, FitbotTools.Session session) {
+	private String systemPrompt(AuthenticatedUser user, FitbotTools.Session session, String extra) {
 		StringBuilder context = new StringBuilder();
 		String first = firstName(user.displayName());
 		if (first != null) {
 			context.append("שם פרטי: ").append(first).append('\n');
 		}
 		context.append(session.run("get_my_progress", mapper.createObjectNode()).path("text").stringValue());
-		return FitbotPrompts.system(knowledge.listEnabled(), context.toString());
+		return FitbotPrompts.system(knowledge.listEnabled(), context.toString(), extra);
 	}
 
-	private List<ChatModel.Turn> history(UUID chatId) {
+	private UUID threadWorkout(UUID chatId) {
+		return jdbc.query("select workout_id from chat_threads where id = ?", (rs, i) -> rs.getObject("workout_id", UUID.class),
+				chatId).stream().findFirst().orElse(null);
+	}
+
+	private UUID threadForWorkout(UUID userId, UUID workoutId) {
+		return jdbc.query("select id from chat_threads where user_id = ? and workout_id = ?",
+				(rs, i) -> rs.getObject("id", UUID.class), userId, workoutId).stream().findFirst().orElse(null);
+	}
+
+	/**
+	 * What the model is told about the workout a conversation is about: the workout as the customer saw it (through the same
+	 * tool the model uses, so locked workouts stay locked), and whether it was finished or, for a level challenge, passed.
+	 * Throws {@code workout_not_completed} if the customer has not finished it.
+	 */
+	String workoutContext(UUID userId, UUID workoutId, FitbotTools.Session session) {
+		Boolean completed = jdbc.queryForObject(
+				"select exists (select 1 from workout_progress where user_id = ? and workout_id = ? and status = 'completed')",
+				Boolean.class, userId, workoutId);
+		Boolean passed = jdbc.query(
+				"select passed from challenge_attempts where user_id = ? and workout_id = ? order by attempted_at desc limit 1",
+				(rs, i) -> rs.getBoolean("passed"), userId, workoutId).stream().findFirst().orElse(null);
+		if (!Boolean.TRUE.equals(completed) && passed == null) {
+			throw new ApiException(HttpStatus.CONFLICT, "workout_not_completed");
+		}
+		String header = jdbc.query("select title_he, goal_he from workouts where id = ?",
+				(rs, i) -> "כותרת: " + rs.getString("title_he") + (rs.getString("goal_he") == null ? "" : "\nמטרה: " + rs.getString("goal_he")),
+				workoutId).stream().findFirst().orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not_found"));
+		String body = session.run("get_workout", mapper.createObjectNode().put("workout_id", workoutId.toString()))
+				.path("text").stringValue();
+		String result = passed != null
+				? "תוצאת האתגר בניסיון האחרון: " + (passed ? "עברו" : "עוד לא עברו (אפשר לנסות שוב בלי הגבלה)")
+				: "האימון סומן כהושלם.";
+		return FitbotPrompts.afterWorkout(body != null ? body : header, result);
+	}
+
+	private List<ChatModel.Turn> history(UUID chatId, boolean afterWorkout) {
 		List<ChatModel.Turn> turns = new ArrayList<>(jdbc.query("""
 				select role, content from (
 				    select role, content, created_at, id from chat_messages where thread_id = ?
@@ -282,10 +372,23 @@ public class FitbotService {
 				) recent order by created_at, id
 				""", (rs, i) -> new ChatModel.Turn(rs.getString("role"), rs.getString("content")), chatId,
 				HISTORY_MESSAGES));
-		while (!turns.isEmpty() && !"user".equals(turns.get(0).role())) {
-			turns.remove(0); // the model needs the first turn to be the customer's
+		return startWithCustomer(turns, afterWorkout);
+	}
+
+	/**
+	 * The model needs the first turn to be the customer's. Older answers cut off at the front are dropped; in a conversation
+	 * that Fitbot opened itself (after a workout) the opening answer is kept and the automatic opener is put before it.
+	 */
+	static List<ChatModel.Turn> startWithCustomer(List<ChatModel.Turn> turns, boolean afterWorkout) {
+		List<ChatModel.Turn> out = new ArrayList<>(turns);
+		if (afterWorkout && !out.isEmpty() && !"user".equals(out.get(0).role())) {
+			out.add(0, new ChatModel.Turn("user", FitbotPrompts.AFTER_WORKOUT_OPENER));
+			return out;
 		}
-		return turns;
+		while (!out.isEmpty() && !"user".equals(out.get(0).role())) {
+			out.remove(0);
+		}
+		return out;
 	}
 
 	record Answer(String text, List<Action> actions) {

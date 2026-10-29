@@ -56,6 +56,12 @@ public class FitbotController {
 		return fitbot.create(user);
 	}
 
+	/** Opens the conversation about a finished workout (Fitbot writes the first message); asking again returns the same one. */
+	@PostMapping("/me/chats/after-workout/{workoutId}")
+	public ChatDto afterWorkout(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID workoutId) {
+		return fitbot.afterWorkout(user, workoutId);
+	}
+
 	@GetMapping("/me/chats/{id}")
 	public ChatDto chat(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
 		return fitbot.get(user, id);
