@@ -66,8 +66,8 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
   roadmap (marks the end of a phase inside a level); every rule treats it like `regular` (only `challenge` is special). Admin
   update may switch regular <-> checkpoint; the challenge type is fixed.
 - Legal side (package `com.fitfam.api.legal`, migration V7 `user_consents`): `ConsentService` stores append-only acceptances
-  (`terms`: terms + privacy versions; `health_declaration`: yes/no answers, medical clearance, confirmations, typed name, 2-year
-  `expires_at`). `LegalVersions` holds the current versions and the question ids; the web app holds the texts and must be bumped
+  (`terms`: terms + privacy versions; `health_declaration`: one versioned declaration (no per-condition answers are stored, on purpose), confirmations, typed name, 2-year
+  `expires_at`). `LegalVersions` holds the current versions; the web app holds the texts and must be bumped
   together. Endpoints: `GET /me/consents`, `POST /me/consents/terms|health`, `GET /me/export` (the caller's data),
   `DELETE /me` (deletes the customer, cascades, also removes their waitlist signup, clears the cookie; admins cannot self-delete).
   `ConsentService.requireCurrent` (403 `consent_required`) guards steps, progress, complete and challenge attempts; admins are exempt.

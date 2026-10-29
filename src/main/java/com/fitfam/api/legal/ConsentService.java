@@ -2,7 +2,6 @@ package com.fitfam.api.legal;
 
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -27,19 +26,23 @@ public class ConsentService {
 	public record Terms(String version, String acceptedAt, boolean current) {
 	}
 
-	public record Health(String version, String declaredAt, String expiresAt, boolean current, boolean medicalClearance) {
+	public record Health(String version, String declaredAt, String expiresAt, boolean current) {
 	}
 
 	/** {@code required} is false for admins (they test the app); {@code ok} = nothing is missing. */
 	public record Status(boolean required, boolean ok, String termsVersion, String privacyVersion, String healthVersion,
-			List<String> questionIds, Terms terms, Health health) {
+			Terms terms, Health health) {
 	}
 
 	public record TermsRequest(String termsVersion, String privacyVersion, boolean adult) {
 	}
 
-	public record HealthRequest(String version, Map<String, Boolean> answers, boolean medicalClearance,
-			boolean riskAcknowledged, boolean accuracyConfirmed, boolean dataConsent, boolean adult, String fullName) {
+	/**
+	 * {@code conditionsDeclaration}: the customer declares that none of the listed conditions applies to them, or that one does
+	 * and a doctor cleared them (the list itself is part of the versioned text in the web app).
+	 */
+	public record HealthRequest(String version, boolean conditionsDeclaration, boolean riskAcknowledged,
+			boolean accuracyConfirmed, boolean dataConsent, boolean adult, String fullName) {
 	}
 
 	private final JdbcTemplate jdbc;
@@ -62,15 +65,14 @@ public class ConsentService {
 				user.id()).stream().findFirst().orElse(null);
 		Health health = jdbc.query("""
 				select version, accepted_at::text as at, expires_at::text as until,
-				       (expires_at > now()) as valid, coalesce((details->>'medicalClearance')::boolean, false) as clearance
+				       (expires_at > now()) as valid
 				from user_consents where user_id = ? and kind = 'health_declaration' order by accepted_at desc limit 1
 				""", (rs, i) -> new Health(rs.getString("version"), rs.getString("at"), rs.getString("until"),
-				LegalVersions.HEALTH.equals(rs.getString("version")) && rs.getBoolean("valid"), rs.getBoolean("clearance")),
+				LegalVersions.HEALTH.equals(rs.getString("version")) && rs.getBoolean("valid")),
 				user.id()).stream().findFirst().orElse(null);
 		boolean required = !user.isAdmin();
 		boolean ok = !required || (terms != null && terms.current() && health != null && health.current());
-		return new Status(required, ok, LegalVersions.TERMS, LegalVersions.PRIVACY, LegalVersions.HEALTH,
-				LegalVersions.HEALTH_QUESTION_IDS, terms, health);
+		return new Status(required, ok, LegalVersions.TERMS, LegalVersions.PRIVACY, LegalVersions.HEALTH, terms, health);
 	}
 
 	/** Customers must have a current acceptance and declaration before they train; admins are exempt. */
@@ -102,11 +104,9 @@ public class ConsentService {
 	@Transactional
 	public Status declareHealth(AuthenticatedUser user, HealthRequest request) {
 		validateHealth(request);
-		boolean anyYes = request.answers().values().stream().anyMatch(Boolean.TRUE::equals);
+		// No medical answers are stored on purpose (data minimisation): only that this exact, versioned declaration was accepted.
 		Map<String, Object> details = new LinkedHashMap<>();
-		details.put("answers", new LinkedHashMap<>(request.answers()));
-		details.put("anyYes", anyYes);
-		details.put("medicalClearance", request.medicalClearance());
+		details.put("conditionsDeclaration", true);
 		details.put("riskAcknowledged", true);
 		details.put("accuracyConfirmed", true);
 		details.put("dataConsent", true);
@@ -124,22 +124,13 @@ public class ConsentService {
 		if (!LegalVersions.HEALTH.equals(request.version())) {
 			throw new ApiException(HttpStatus.CONFLICT, "version_outdated");
 		}
-		Map<String, Boolean> answers = request.answers();
-		if (answers == null || answers.size() != LegalVersions.HEALTH_QUESTION_IDS.size()
-				|| !answers.keySet().containsAll(LegalVersions.HEALTH_QUESTION_IDS)
-				|| answers.values().stream().anyMatch(v -> v == null)) {
-			throw new ApiException(HttpStatus.BAD_REQUEST, "answers_incomplete");
-		}
-		if (!request.adult() || !request.riskAcknowledged() || !request.accuracyConfirmed() || !request.dataConsent()) {
+		if (!request.conditionsDeclaration() || !request.adult() || !request.riskAcknowledged()
+				|| !request.accuracyConfirmed() || !request.dataConsent()) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "confirmations_required");
 		}
 		String name = request.fullName() == null ? "" : request.fullName().trim();
 		if (name.length() < 2 || name.length() > 100) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "name_required");
-		}
-		boolean anyYes = answers.values().stream().anyMatch(Boolean.TRUE::equals);
-		if (anyYes && !request.medicalClearance()) {
-			throw new ApiException(HttpStatus.BAD_REQUEST, "medical_clearance_required");
 		}
 	}
 
