@@ -118,14 +118,24 @@ public class PaceService {
 		return status(userId);
 	}
 
-	/** True when the customer follows a plan that has a published running workout, so a 5 km time is useful to them. */
+	/**
+	 * True when a 5 km time is useful to the customer: they follow a plan flagged {@code uses_paces}, or a plan with a
+	 * published workout that is a running workout or contains a run segment (so a mixed plan qualifies as soon as it has one).
+	 */
 	boolean usesPaces(UUID userId) {
 		Boolean found = jdbc.queryForObject("""
 				select exists (
 				    select 1 from enrollments e
-				    join plan_levels l on l.plan_id = e.plan_id
-				    join workouts w on w.level_id = l.id and w.status = 'published' and w.sport = 'running'
-				    where e.user_id = ? and e.status <> 'ended')
+				    join plans p on p.id = e.plan_id
+				    where e.user_id = ? and e.status <> 'ended' and (
+				        p.uses_paces
+				        or exists (
+				            select 1 from plan_levels l
+				            join workouts w on w.level_id = l.id and w.status = 'published'
+				            where l.plan_id = p.id and (
+				                w.sport = 'running'
+				                or jsonb_path_exists(w.details,
+				                    '$.sections[*].blocks[*].lines[*] ? (@.activity == "run")')))))
 				""", Boolean.class, userId);
 		return Boolean.TRUE.equals(found);
 	}
