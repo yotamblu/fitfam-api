@@ -38,6 +38,6 @@ services:
         sync: false
       - key: GEMINI_MODEL
         sync: false
-      # Only the team may use Fitbot while the provider is on a free tier. Set to "false" once billing is on.
+      # Fitbot is open to every account. Set to "true" to limit it to admins (for example while on a free provider tier).
       - key: FITBOT_ADMINS_ONLY
-        value: "true"
+        value: "false"
