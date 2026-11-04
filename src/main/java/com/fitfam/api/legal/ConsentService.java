@@ -164,6 +164,11 @@ public class ConsentService {
 		out.put("consents", jdbc.queryForList("""
 				select kind, version, accepted_at::text as accepted_at, expires_at::text as expires_at, details::text as details
 				from user_consents where user_id = ? order by accepted_at""", userId));
+		out.put("workoutLog", jdbc.queryForList("""
+				select w.title_he as workout, e.name_he as exercise, s.set_number, s.weight_kg, s.reps,
+				       s.updated_at::text as updated_at
+				from set_logs s join workouts w on w.id = s.workout_id join exercises e on e.id = s.exercise_id
+				where s.user_id = ? order by s.updated_at, s.set_number""", userId));
 		out.put("fitbotChats", jdbc.queryForList("""
 				select t.title, m.role, m.content, m.created_at::text as created_at
 				from chat_messages m join chat_threads t on t.id = m.thread_id

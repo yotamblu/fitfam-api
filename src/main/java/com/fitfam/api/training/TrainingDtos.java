@@ -1,11 +1,14 @@
 package com.fitfam.api.training;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 import tools.jackson.databind.JsonNode;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -114,6 +117,23 @@ public final class TrainingDtos {
 	}
 
 	public record AttemptRequest(@NotNull Boolean passed) {
+	}
+
+	// ---- the optional workout log ----
+
+	/** One set the customer wrote down; either value may be missing. */
+	public record LogSetRequest(@NotNull UUID exerciseId, @Min(1) @Max(50) int setNumber,
+			@DecimalMin("0") @DecimalMax("1000") BigDecimal weightKg, @Min(0) @Max(1000) Integer reps) {
+	}
+
+	public record LogSetDto(String exerciseId, int setNumber, BigDecimal weightKg, Integer reps) {
+	}
+
+	/** What the customer logged for one exercise the last time it was in a (different) workout. */
+	public record PreviousLogDto(String exerciseId, String workoutTitleHe, Instant loggedAt, List<LogSetDto> sets) {
+	}
+
+	public record WorkoutLogDto(String workoutId, boolean editable, List<LogSetDto> sets, List<PreviousLogDto> previous) {
 	}
 
 	public record AttemptResultDto(boolean passed, int currentLevelNumber, boolean levelChanged,

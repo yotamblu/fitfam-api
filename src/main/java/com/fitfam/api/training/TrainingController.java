@@ -25,7 +25,9 @@ import com.fitfam.api.training.TrainingDtos.MyPlanDto;
 import com.fitfam.api.training.TrainingDtos.PaceRequest;
 import com.fitfam.api.training.TrainingDtos.ProgressRequest;
 import com.fitfam.api.training.TrainingDtos.RoadmapDto;
+import com.fitfam.api.training.TrainingDtos.LogSetRequest;
 import com.fitfam.api.training.TrainingDtos.StepsDto;
+import com.fitfam.api.training.TrainingDtos.WorkoutLogDto;
 
 import jakarta.validation.Valid;
 
@@ -39,9 +41,11 @@ public class TrainingController {
 	private final ExerciseService exercises;
 	private final PaceService paces;
 	private final ConsentService consents;
+	private final WorkoutLogService logs;
 
 	public TrainingController(ProgressService progress, StepExpander expander, StatsService stats,
-			ExerciseService exercises, PaceService paces, ConsentService consents) {
+			ExerciseService exercises, PaceService paces, ConsentService consents, WorkoutLogService logs) {
+		this.logs = logs;
 		this.paces = paces;
 		this.consents = consents;
 		this.progress = progress;
@@ -110,6 +114,22 @@ public class TrainingController {
 			@Valid @RequestBody ProgressRequest request) {
 		consents.requireCurrent(user);
 		progress.saveProgress(user.id(), id, request.resumeStep());
+	}
+
+	/** The optional weight and reps log of a workout, with what was logged for each exercise the time before. */
+	@GetMapping("/workouts/{id}/log")
+	public WorkoutLogDto log(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
+		consents.requireCurrent(user);
+		return logs.get(user.id(), id);
+	}
+
+	/** Writes one set of the log (a set with neither weight nor reps is removed). */
+	@PutMapping("/workouts/{id}/log")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void saveLog(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
+			@Valid @RequestBody LogSetRequest request) {
+		consents.requireCurrent(user);
+		logs.save(user.id(), id, request);
 	}
 
 	@PostMapping("/workouts/{id}/complete")

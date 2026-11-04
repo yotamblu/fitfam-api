@@ -65,6 +65,7 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
 - Workout `type` is `regular`, `checkpoint` or `challenge` (migration V5). A checkpoint is a regular workout with a star on the
   roadmap (marks the end of a phase inside a level); every rule treats it like `regular` (only `challenge` is special). Admin
   update may switch regular <-> checkpoint; the challenge type is fixed.
+- Workout log (migration V10 `set_logs`, `WorkoutLogService`): optional weight (kg, 0-1000) and reps per set of one exercise in one workout, one row per (user, workout, exercise, set number), either value may be missing, a set with neither is deleted. `GET /workouts/{id}/log` returns the caller's sets, `editable` (only while the workout is `current` or `open`; a finished workout is read-only, 409 `log_closed`) and, per exercise, `previous` = the sets of the most recent OTHER workout where the caller logged it. `PUT /workouts/{id}/log` saves one set (`exerciseId` must be used by that workout, else 400 `exercise_not_in_workout`). Both need current consents. Cascades with the user; included in `/me/export` as `workoutLog`. Keys are exercise + set number, so an exercise used in two lines of one workout would share rows (accepted).
 - Legal side (package `com.fitfam.api.legal`, migration V7 `user_consents`): `ConsentService` stores append-only acceptances
   (`terms`: terms + privacy versions; `health_declaration`: one versioned declaration (no per-condition answers are stored, on purpose), confirmations, typed name, 2-year
   `expires_at`). `LegalVersions` holds the current versions; the web app holds the texts and must be bumped
@@ -85,7 +86,7 @@ logs and `/db-local/`.
 ## Commands
 - Run: `./mvnw -Djava.version=17 spring-boot:run` (PowerShell: `.\mvnw.cmd ...`); check `curl localhost:8081/health`.
   Drop `-Djava.version=17` once JDK 21 is installed (this machine has only JDK 17; the code needs nothing newer).
-- Test: `./mvnw -Djava.version=17 test` (120 tests; mocks only, no real DB, Google or AI provider needed).
+- Test: `./mvnw -Djava.version=17 test` (122 tests; mocks only, no real DB, Google or AI provider needed).
 
 ## Deployment (Render free plan)
 - Render builds from GitHub using `Dockerfile` + `render.yaml` (Blueprint: free plan, Frankfurt, `/health`). The image
