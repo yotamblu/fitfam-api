@@ -23,6 +23,7 @@ import com.fitfam.api.training.TrainingDtos.CustomerWorkoutDto;
 import com.fitfam.api.training.TrainingDtos.ExerciseDto;
 import com.fitfam.api.training.TrainingDtos.MyPlanDto;
 import com.fitfam.api.training.TrainingDtos.PaceRequest;
+import com.fitfam.api.training.TrainingDtos.PaceZoneRequest;
 import com.fitfam.api.training.TrainingDtos.ProgressRequest;
 import com.fitfam.api.training.TrainingDtos.RoadmapDto;
 import com.fitfam.api.training.TrainingDtos.LogSetRequest;
@@ -85,6 +86,25 @@ public class TrainingController {
 		return paces.clear(user.id());
 	}
 
+	/** The customer's own range for easy, threshold or interval (replaces the calculated one until the 5 km time changes). */
+	@PutMapping("/me/pace/zones/{kind}")
+	public PaceService.PaceStatus setPaceZone(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable String kind,
+			@Valid @RequestBody PaceZoneRequest request) {
+		return paces.setZone(user.id(), kind, request.fastSecPerKm(), request.slowSecPerKm());
+	}
+
+	/** Back to the calculated range for one kind. */
+	@DeleteMapping("/me/pace/zones/{kind}")
+	public PaceService.PaceStatus resetPaceZone(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable String kind) {
+		return paces.resetZone(user.id(), kind);
+	}
+
+	/** Back to the calculated ranges for every kind. */
+	@DeleteMapping("/me/pace/zones")
+	public PaceService.PaceStatus resetPaceZones(@AuthenticationPrincipal AuthenticatedUser user) {
+		return paces.resetZone(user.id(), null);
+	}
+
 	@GetMapping("/me/plans")
 	public List<MyPlanDto> myPlans(@AuthenticationPrincipal AuthenticatedUser user) {
 		return progress.myPlans(user.id());
@@ -105,7 +125,7 @@ public class TrainingController {
 	public StepsDto steps(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
 		consents.requireCurrent(user);
 		CustomerWorkoutDto workout = progress.openWorkout(user.id(), id);
-		return new StepsDto(workout.id(), workout.resumeStep(), expander.expand(workout.content(), paces.fiveKSec(user.id())));
+		return new StepsDto(workout.id(), workout.resumeStep(), expander.expand(workout.content(), paces.profile(user.id())));
 	}
 
 	@PutMapping("/workouts/{id}/progress")

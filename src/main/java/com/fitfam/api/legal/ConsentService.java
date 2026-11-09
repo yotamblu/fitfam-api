@@ -164,6 +164,9 @@ public class ConsentService {
 		out.put("consents", jdbc.queryForList("""
 				select kind, version, accepted_at::text as accepted_at, expires_at::text as expires_at, details::text as details
 				from user_consents where user_id = ? order by accepted_at""", userId));
+		out.put("paceOverrides", jdbc.queryForList("""
+				select kind, fast_sec, slow_sec, updated_at::text as updated_at
+				from pace_overrides where user_id = ? order by kind""", userId));
 		out.put("workoutLog", jdbc.queryForList("""
 				select w.title_he as workout, e.name_he as exercise, s.set_number, s.weight_kg, s.reps,
 				       s.updated_at::text as updated_at

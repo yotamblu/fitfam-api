@@ -101,6 +101,11 @@ public final class TrainingDtos {
 	public record PaceRequest(@NotNull @Min(PaceService.MIN_FIVE_K_SEC) @Max(PaceService.MAX_FIVE_K_SEC) Integer fiveKSec) {
 	}
 
+	/** A customer's own range for one pace kind, seconds per km (checked against the limits in {@code PaceService}). */
+	public record PaceZoneRequest(@NotNull @Min(PaceService.MIN_ZONE_SEC) @Max(PaceService.MAX_ZONE_SEC) Integer fastSecPerKm,
+			@NotNull @Min(PaceService.MIN_ZONE_SEC) @Max(PaceService.MAX_ZONE_SEC) Integer slowSecPerKm) {
+	}
+
 	public record ProgressRequest(@Min(0) @Max(10000) int resumeStep) {
 	}
 

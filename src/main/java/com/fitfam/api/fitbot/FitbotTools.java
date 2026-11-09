@@ -165,7 +165,7 @@ public class FitbotTools {
 			if (w.descriptionHe() != null && !w.descriptionHe().isBlank()) {
 				sb.append("תיאור: ").append(w.descriptionHe()).append('\n');
 			}
-			sb.append(render(expander.expand(w.content(), paces.fiveKSec(userId))));
+			sb.append(render(expander.expand(w.content(), paces.profile(userId))));
 			return text(sb.toString());
 		}
 

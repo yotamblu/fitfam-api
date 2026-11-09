@@ -57,10 +57,9 @@ may exist in a private `../CLAUDE.md` outside this repo; never copy it here.
 - The challenge of any level below the top can always be attempted (it is also the skip-ahead test: passing it moves up
   one level); the top level's challenge needs everything before it (`canAttempt` in `ProgressService.compute`).
 - Personal running paces (migration V4: `users.five_k_sec` 720-4200 s, `five_k_updated_at`; not on the JPA entity). `PaceService`
-  turns the customer's 5 km time into four paces as speed bands of the 5 km speed (easy 77-83 %, threshold 93-96 %, interval
-  100-105 %, 5 km 100 %; they agree with Daniels VDOT), rounded to 5 s per km; a distance repeat also gets a target time per
-  repeat (nearest second). Only the 5 km time is stored. Endpoints: `GET/PUT/DELETE /me/pace` (`needed` = no time yet and the customer follows a plan flagged `plans.uses_paces` (migration V6, set by hand in the database), or a plan with a published running-sport workout or a workout containing a run segment). An endurance line may carry `pace` (`easy|threshold|interval|fivek`,
-  run only) and `activity` may be `walk`; `StepExpander.expand(content, fiveKSec)` fills `target.pace` (kind, Hebrew label and
+  turns the customer's 5 km time into four paces with the Daniels-Gilbert fitness score (VDOT) and a share of it per pace (easy 62-66 %, threshold 86-88 %, interval 95-98 %; the 5 km pace is the time / 5), rounded to 5 s per km; a distance repeat also gets a target time per
+  repeat (nearest second). The 5 km time is stored, plus optional own ranges for easy/threshold/interval (migration V11 `pace_overrides`, one row per user and kind; `PaceProfile` carries both into `StepExpander`; a different 5 km time deletes them). Endpoints: `GET/PUT/DELETE /me/pace`, `PUT/DELETE /me/pace/zones/{kind}` and `DELETE /me/pace/zones` (own range / back to calculated; 409 `five_k_required` without a time) (`needed` = no time yet and the customer follows a plan flagged `plans.uses_paces` (migration V6, set by hand in the database), or a plan with a published running-sport workout or a workout containing a run segment). An endurance line may carry `pace` (`easy|threshold|interval|fivek`,
+  run only) and `activity` may be `walk`; `StepExpander.expand(content, paceProfile)` fills `target.pace` (kind, Hebrew label and
   feel, fast/slow sec per km, repeat times; numbers null without a 5 km time). `GET /workouts/{id}/steps` uses the caller's time.
 - Workout `type` is `regular`, `checkpoint` or `challenge` (migration V5). A checkpoint is a regular workout with a star on the
   roadmap (marks the end of a phase inside a level); every rule treats it like `regular` (only `challenge` is special). Admin
@@ -86,7 +85,7 @@ logs and `/db-local/`.
 ## Commands
 - Run: `./mvnw -Djava.version=17 spring-boot:run` (PowerShell: `.\mvnw.cmd ...`); check `curl localhost:8081/health`.
   Drop `-Djava.version=17` once JDK 21 is installed (this machine has only JDK 17; the code needs nothing newer).
-- Test: `./mvnw -Djava.version=17 test` (122 tests; mocks only, no real DB, Google or AI provider needed).
+- Test: `./mvnw -Djava.version=17 test` (124 tests; mocks only, no real DB, Google or AI provider needed).
 
 ## Deployment (Render free plan)
 - Render builds from GitHub using `Dockerfile` + `render.yaml` (Blueprint: free plan, Frankfurt, `/health`). The image
